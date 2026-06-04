@@ -72,6 +72,7 @@ input,select,textarea{font-family:var(--font);}
 .main-col{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:54px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;box-shadow:0 1px 8px rgba(139,0,0,0.06);}
 .topbar-title{font-size:15px;font-weight:700;color:var(--navy);letter-spacing:-0.02em;}
+.topbar-greet{font-size:13px;font-weight:500;color:var(--text2);}
 .topbar-logo{font-size:16px;font-weight:700;letter-spacing:-0.03em;display:flex;align-items:center;gap:8px;}
 .logo-icon{width:30px;height:30px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .logo-icon svg{width:16px;height:16px;fill:#fff;}
@@ -256,7 +257,7 @@ input,select,textarea{font-family:var(--font);}
     </div>
   </div>
   <div class="main-col">
-    <div class="topbar"><div class="topbar-title" id="page-title">FortyApp</div></div>
+    <div class="topbar"><div class="topbar-title" id="page-title">FortyApp</div><div class="topbar-greet" id="topbar-greet"></div></div>
     <div class="main" id="main-content"></div>
   </div>
 </div>
@@ -406,11 +407,21 @@ async function doLogin(){
     btn.disabled=false; btn.textContent='Ingresar';
   }
 }
+function greetingText(){
+  const n = currentUser.nombre || '';
+  const d = new Date(); const day = d.getDay(); const h = d.getHours();
+  let extra = '';
+  if(day===1) extra = ' · ¡Buena semana!';
+  else if(day===5 && h>=16) extra = ' · ¡Buen finde!';
+  else if(day===6 || day===0) extra = ' · ¡Buen finde!';
+  return `Hola, ${n}${extra}`;
+}
 function applyCurrentUser(){
   buildNav();
   document.getElementById('topbar-role').textContent=ROLES[currentRole].label;
   document.getElementById('topbar-avatar').textContent=currentUser.iniciales;
   document.getElementById('topbar-username').textContent=currentUser.nombre;
+  const g=document.getElementById('topbar-greet'); if(g) g.textContent=greetingText();
 }
 function doLogout(){
   document.getElementById('app-shell').style.display='none';
