@@ -348,7 +348,22 @@ function genVisitas(){
   }
   return v;
 }
-let VISITAS=genVisitas();
+let VISITAS=[];
+async function loadVisitasFromDB(){
+  const [{data:vis,error:e1},{data:fac,error:e2}] = await Promise.all([
+    SB.from('visitas').select('*').order('fecha',{ascending:true}),
+    SB.from('visita_facing').select('*')
+  ]);
+  if(e1||e2){ VISITAS=[]; return; }
+  const facByVisita={};
+  (fac||[]).forEach(f=>{ (facByVisita[f.visita_id]=facByVisita[f.visita_id]||[]).push({nombre:f.producto,marca:f.marca,total:f.total||0,detalle:[]}); });
+  VISITAS=(vis||[]).map(v=>({
+    id:v.id, fecha:v.fecha, hora:v.hora, vendedor:v.vendedor, cliente:v.cliente, barrio:v.barrio,
+    calle:v.calle, numero:v.numero, tipo:v.tipo, lat:v.lat, lng:v.lng,
+    venta:!!v.venta, marcaVenta:v.marca_venta||'', prodVenta:v.producto_venta||'', presVenta:v.presentacion_venta||'',
+    hayFacing:!!v.hay_facing, productos:facByVisita[v.id]||[], totalFacing:v.total_facing||0
+  }));
+}
 
 function getToday(){return new Date().toISOString().slice(0,10);}
 function getThisMonth(){return new Date().toISOString().slice(0,7);}
@@ -395,7 +410,7 @@ async function doLogin(){
     currentUser={ nombre:data.nombre, iniciales:data.iniciales||initialsFrom(data.nombre), rol:data.rol, vendedor:data.vendedor };
     currentRole=data.rol;
     await loadCatalogoFromDB();
-    VISITAS=genVisitas();            // datos de ejemplo usando ya tus marcas reales (visitas reales = próxima etapa)
+    await loadVisitasFromDB();       // visitas reales (vacías hasta que se carguen)
     document.getElementById('login-page').style.display='none';
     document.getElementById('app-shell').style.display='flex';
     applyCurrentUser();
@@ -755,7 +770,66 @@ function updateFacingSummary(){
   const sumEl=document.getElementById('facing-summary');
   if(sumEl)sumEl.textContent=`Total facing: ${tot} unidades en ${blocks.length} producto(s)`;
 }
-function guardarVisita(){ showToast('✓ Visita guardada correctamente'); setTimeout(()=>navigate('mis-visitas'),800); }
+async function guardarVisita(){
+  const venta=document.getElementById('f-venta').checked;
+  const hayFacing=document.getElementById('f-facing').checked;
+  const now=new Date();
+  const visita={
+    fecha: now.toISOString().slice(0,10),
+    hora: now.toTimeString().slice(0,5),
+    vendedor: currentUser.nombre,
+    cliente: null,
+    tipo: document.getElementById('f-tipo').value.trim()||null,
+    barrio: document.getElementById('f-barrio').value.trim()||null,
+    calle: document.getElementById('f-calle').value.trim()||null,
+    numero: document.getElementById('f-num').value.trim()||null,
+    venta,
+    marca_venta: venta ? (document.getElementById('venta-marca').value||null) : null,
+    producto_venta: venta ? (document.getElementById('venta-prod').value||null) : null,
+    presentacion_venta: venta ? (document.getElementById('venta-pres').value||null) : null,
+    hay_facing: hayFacing,
+    total_facing: 0
+  };
+  if(!visita.barrio){ return showToast('Completá al menos el barrio'); }
+  // recolectar facing del formulario
+  const facing=[];
+  if(hayFacing){
+    document.querySelectorAll('#productos-list .product-block').forEach(block=>{
+      const marca=block.querySelector('select')?.value||'';
+      const prodSel=block.querySelector('[id^="prod-sel-"]');
+      const producto=prodSel?prodSel.value:'';
+      const totalInp=block.querySelector('[id^="total-"]');
+      const total=parseInt(totalInp?.value)||0;
+      if(!marca && !producto) return;
+      const detalle=[];
+      block.querySelectorAll('.pres-row').forEach(r=>{
+        const presentacion=r.querySelector('select')?.value||'';
+        const cantidad=parseInt(r.querySelector('input')?.value)||0;
+        if(presentacion) detalle.push({presentacion,cantidad});
+      });
+      facing.push({marca,producto,total,detalle});
+    });
+  }
+  visita.total_facing=facing.reduce((s,f)=>s+f.total,0);
+  try{
+    const {data,error}=await SB.from('visitas').insert(visita).select().single();
+    if(error) throw error;
+    for(const f of facing){
+      const {data:fd,error:fe}=await SB.from('visita_facing').insert({visita_id:data.id,marca:f.marca,producto:f.producto,total:f.total}).select().single();
+      if(fe) throw fe;
+      if(f.detalle.length){
+        const rows=f.detalle.map(d=>({facing_id:fd.id,presentacion:d.presentacion,cantidad:d.cantidad}));
+        const {error:de}=await SB.from('visita_facing_detalle').insert(rows);
+        if(de) throw de;
+      }
+    }
+    showToast('✓ Visita guardada');
+    await loadVisitasFromDB();
+    navigate('mis-visitas');
+  }catch(e){
+    showToast('Error guardando: '+(e.message||e));
+  }
+}
 
 // ── MIS VISITAS ──
 let misVisitasFiltros={mes:'',cliente:''};
@@ -1576,7 +1650,7 @@ function showToast(msg){
 }
 function exportCSV(){
   const headers=['id','fecha','vendedor','barrio','calle','numero','lat','lng','venta','marcaVenta','prodVenta','presVenta','hayFacing','totalFacing'];
-  const rows=VISITAS.map(v=>[v.id,v.fecha,v.vendedor,v.barrio,v.calle,v.numero,v.lat.toFixed(6),v.lng.toFixed(6),v.venta?1:0,v.marcaVenta||'',v.prodVenta||'',v.presVenta||'',v.hayFacing?1:0,v.totalFacing].join(','));
+  const rows=VISITAS.map(v=>[v.id,v.fecha,v.vendedor,v.barrio,v.calle,v.numero,(v.lat||0).toFixed(6),(v.lng||0).toFixed(6),v.venta?1:0,v.marcaVenta||'',v.prodVenta||'',v.presVenta||'',v.hayFacing?1:0,v.totalFacing].join(','));
   const csv=[headers.join(','),...rows].join('\n');
   const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download='fortyapp_visitas.csv'; a.click();
   showToast('✓ CSV descargado');
