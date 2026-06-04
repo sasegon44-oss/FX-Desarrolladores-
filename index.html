@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FortyApp — Seguimiento de Vendedores</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #faf7f7;
+  --bg2: #ffffff;
+  --bg3: #f2ecec;
+  --bg4: #e8d8d8;
+  --bg5: #ddc9c9;
+  --border: #e8d8d8;
+  --border2: #d4b8b8;
+  --text: #1a0a0a;
+  --text2: #6b3a3a;
+  --text3: #9e7070;
+  --accent: #c0392b;
+  --accent2: #a93226;
+  --accent3: #e74c3c;
+  --crimson: #8b0000;
+  --navy: #1a0a0a;
+  --green: #0ea15a;
+  --green2: #0c8a4d;
+  --amber: #e08c00;
+  --red: #c0392b;
+  --purple: #7c3aed;
+  --teal: #0ea1a1;
+  --font: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;overflow-x:hidden;}
+button{font-family:var(--font);cursor:pointer;}
+input,select,textarea{font-family:var(--font);}
+
+.app{display:flex;flex-direction:row;height:100vh;overflow:hidden;}
+.sidebar{width:230px;min-width:230px;background:linear-gradient(180deg,#1a0a0a 0%,#250e0e 60%,#2e1111 100%);display:flex;flex-direction:column;flex-shrink:0;box-shadow:4px 0 20px rgba(0,0,0,0.3);overflow:hidden;transition:width .2s,min-width .2s;}
+.sidebar.collapsed{width:60px;min-width:60px;}
+.sb-top{padding:18px 14px 14px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:8px;}
+.sb-logo{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+.sb-toggle-btn{background:rgba(255,255,255,0.07);border:none;color:rgba(255,255,255,0.55);cursor:pointer;border-radius:6px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:background .15s;}
+.sb-toggle-btn:hover{background:rgba(255,255,255,0.16);}
+.sidebar.collapsed .sb-logo,.sidebar.collapsed .ni-label,.sidebar.collapsed .sb-user-info,.sidebar.collapsed .sb-logout{display:none;}
+.sidebar.collapsed .sb-top{padding:14px 8px;justify-content:center;}
+.sidebar.collapsed .nav-item{justify-content:center;padding:10px 0;}
+.sidebar.collapsed .sb-user{padding:12px 0;justify-content:center;}
+.sb-brand{font-size:15px;font-weight:700;letter-spacing:-0.03em;color:#fff;}
+.sb-brand .logo-app{color:var(--accent3);}
+.sb-brand-sub{font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;}
+.sb-nav{flex:1;overflow-y:auto;padding:10px 0;display:flex;flex-direction:column;}
+.nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:10px 18px;border:none;background:transparent;color:rgba(255,255,255,0.55);cursor:pointer;font-size:13px;font-family:var(--font);text-align:left;white-space:nowrap;border-left:3px solid transparent;transition:all 0.15s;}
+.nav-item:hover{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.92);}
+.nav-item.active{background:rgba(192,57,43,0.22);color:#fff;border-left-color:var(--accent3);font-weight:600;}
+.nav-item .ni-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0;}
+.sb-user{padding:12px 14px;border-top:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:8px;}
+.sb-user .avatar{flex-shrink:0;}
+.sb-user-info{flex:1;overflow:hidden;}
+.sb-user-name{font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sb-user-role{font-size:10px;color:rgba(255,255,255,0.4);margin-top:1px;}
+.sb-logout{background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.6);cursor:pointer;border-radius:6px;padding:6px 8px;font-size:11px;font-family:var(--font);display:flex;align-items:center;gap:4px;flex-shrink:0;transition:background 0.15s;}
+.sb-logout:hover{background:rgba(255,255,255,0.15);}
+.main-col{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:54px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;box-shadow:0 1px 8px rgba(139,0,0,0.06);}
+.topbar-title{font-size:15px;font-weight:700;color:var(--navy);letter-spacing:-0.02em;}
+.topbar-logo{font-size:16px;font-weight:700;letter-spacing:-0.03em;display:flex;align-items:center;gap:8px;}
+.logo-icon{width:30px;height:30px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.logo-icon svg{width:16px;height:16px;fill:#fff;}
+.logo-forty{color:var(--text);}
+.logo-app{color:var(--accent3);}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--accent2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;}
+.main{flex:1;overflow-y:auto;padding:18px;background:var(--bg);}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;box-shadow:0 1px 3px rgba(139,0,0,0.06);}
+.card-title{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:14px;}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
+@media(min-width:600px){.kpi-grid{grid-template-columns:repeat(4,1fr);}}
+@media(min-width:900px){.kpi-grid{grid-template-columns:repeat(6,1fr);}}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(139,0,0,0.06);}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kpi-color, var(--accent));}
+.kpi-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;}
+.kpi-val{font-size:24px;font-weight:600;font-family:var(--mono);letter-spacing:-0.03em;color:var(--text);}
+.kpi-sub{font-size:10px;color:var(--text3);margin-top:4px;}
+.kpi-delta{font-size:10px;font-weight:500;margin-top:2px;}
+.kpi-delta.up{color:var(--green);}
+.kpi-delta.down{color:var(--red);}
+
+.charts-row{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:14px;}
+@media(min-width:600px){.charts-row{grid-template-columns:1fr 1fr;}}
+.chart-wrap{position:relative;height:200px;}
+
+.heatmap-controls{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.hm-tab{padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:none;color:var(--text2);font-size:12px;font-weight:500;transition:all 0.15s;}
+.hm-tab.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.hm-scroll{overflow-x:auto;scrollbar-width:thin;}
+.hm-table{border-collapse:collapse;min-width:500px;}
+.hm-table th{font-size:10px;font-weight:500;color:var(--text3);padding:4px 8px;text-align:center;}
+.hm-table td.row-label{font-size:11px;color:var(--text2);padding:4px 10px 4px 0;white-space:nowrap;}
+.hm-cell{width:52px;height:30px;border-radius:4px;text-align:center;vertical-align:middle;font-size:10px;font-weight:500;cursor:pointer;transition:transform 0.1s;border:1px solid transparent;}
+.hm-cell:hover{transform:scale(1.08);border-color:rgba(0,0,0,0.3);}
+.hm-legend{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:10px;color:var(--text3);}
+.hm-swatch{width:14px;height:10px;border-radius:2px;}
+
+.v-table{width:100%;border-collapse:collapse;}
+.v-table th{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.85);background:var(--navy);padding:9px 10px;text-align:left;}
+.v-table td{padding:10px 10px;border-bottom:1px solid var(--border);font-size:13px;}
+.v-table tr:last-child td{border:none;}
+.hist-table td{font-size:12px;padding:6px 9px;border-bottom:1px solid var(--border);}
+.hist-table th{padding:7px 8px;}
+.hist-total td{background:var(--bg3);font-weight:700;border-top:1px solid var(--border2);}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}
+.badge-green{background:rgba(34,201,147,0.15);color:var(--green);}
+.badge-amber{background:rgba(245,158,42,0.15);color:var(--amber);}
+.badge-red{background:rgba(231,76,60,0.15);color:var(--red);}
+.bar-mini{height:4px;border-radius:2px;background:var(--accent);display:inline-block;vertical-align:middle;margin-left:6px;}
+
+.form-section{margin-bottom:20px;}
+.form-section-title{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px;font-weight:500;}
+.field input,.field select,.field textarea{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:10px 12px;font-size:14px;transition:border-color 0.15s;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent3);}
+.field select option{background:var(--bg3);}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.field-auto{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-size:13px;color:var(--text2);font-family:var(--mono);}
+.toggle-row{display:flex;align-items:center;gap:12px;}
+.toggle-label{font-size:14px;color:var(--text);}
+.toggle{position:relative;width:44px;height:24px;}
+.toggle input{opacity:0;width:0;height:0;position:absolute;}
+.toggle-track{position:absolute;inset:0;border-radius:12px;background:var(--bg4);border:1px solid var(--border2);cursor:pointer;transition:background 0.2s;}
+.toggle input:checked+.toggle-track{background:var(--accent);}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform 0.2s;pointer-events:none;}
+.toggle input:checked~.toggle-thumb{transform:translateX(20px);}
+
+.facing-builder{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;margin-top:12px;}
+.product-block{background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);padding:12px;margin-bottom:10px;position:relative;}
+.pres-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;margin-bottom:6px;}
+.pres-row input,.pres-row select{padding:8px 10px;font-size:13px;}
+.facing-total{font-size:12px;font-family:var(--mono);}
+.facing-ok{color:var(--green);}
+.facing-err{color:var(--red);}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius);border:none;font-size:13px;font-weight:500;transition:all 0.15s;cursor:pointer;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:var(--accent2);}
+.btn-secondary{background:var(--bg4);color:var(--text2);border:1px solid var(--border2);}
+.btn-secondary:hover{color:var(--text);border-color:var(--border2);}
+.btn-danger{background:rgba(231,76,60,0.15);color:var(--red);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.btn-full{width:100%;justify-content:center;padding:13px;}
+.remove-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;}
+.remove-btn:hover{color:var(--red);}
+
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.filters select,.filters input{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;}
+
+.map-mock{position:relative;border-radius:var(--radius);overflow:hidden;height:280px;background:#1a0a0a;}
+.map-mock canvas{position:absolute;inset:0;}
+.map-overlay{position:absolute;top:8px;left:8px;background:rgba(26,10,10,0.85);border-radius:6px;padding:6px 10px;font-size:11px;color:rgba(255,255,255,0.85);}
+
+.login-page{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(145deg,#1a0a0a 0%,#250e0e 50%,#3d0e0e 100%);}
+.login-card{background:var(--bg2);border:none;border-top:5px solid var(--accent);border-radius:20px;padding:36px 30px;width:100%;max-width:380px;margin:16px;box-shadow:0 32px 80px rgba(0,0,0,0.45);}
+.login-logo{font-size:26px;font-weight:700;letter-spacing:-0.04em;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.login-sub{font-size:13px;color:var(--text2);margin-bottom:24px;}
+.login-roles{display:flex;gap:8px;margin-bottom:20px;}
+.role-btn{flex:1;padding:10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:12px;font-weight:500;cursor:pointer;transition:all 0.15s;}
+.role-btn.active{background:rgba(192,57,43,0.16);border-color:var(--accent);color:var(--accent3);}
+
+.month-bar{background:var(--bg3);border-radius:4px;height:6px;overflow:hidden;margin-top:4px;}
+.month-fill{height:100%;border-radius:4px;background:var(--green);transition:width 0.5s;}
+.timeline{display:flex;gap:3px;align-items:flex-end;height:60px;padding:4px 0;}
+.tl-bar{flex:1;background:var(--accent);border-radius:2px 2px 0 0;opacity:0.7;transition:opacity 0.15s;cursor:pointer;min-width:4px;}
+.tl-bar:hover{opacity:1;}
+.tl-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:3px;}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.stat-mini{background:var(--bg3);border-radius:var(--radius);padding:10px 12px;}
+.stat-mini-val{font-size:18px;font-weight:600;font-family:var(--mono);}
+.stat-mini-lbl{font-size:10px;color:var(--text3);margin-top:2px;}
+
+/* Catalog management */
+.catalog-section{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;margin-bottom:14px;}
+.catalog-marca{background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);padding:12px;margin-bottom:10px;}
+.catalog-marca-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.catalog-marca-name{font-weight:600;font-size:14px;color:var(--text);}
+.product-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;background:var(--bg5);font-size:12px;color:var(--text);margin:3px;}
+.product-tag .tag-remove{background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;line-height:1;margin-left:2px;}
+.product-tag .tag-remove:hover{color:var(--red);}
+.pres-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px;background:rgba(192,57,43,0.14);font-size:11px;color:var(--accent3);margin:2px;}
+.pres-tag .tag-remove{background:none;border:none;color:var(--accent2);cursor:pointer;font-size:11px;line-height:1;}
+.pres-tag .tag-remove:hover{color:var(--red);}
+.add-inline{display:flex;gap:6px;margin-top:8px;}
+.add-inline input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:6px 10px;font-size:12px;}
+.add-inline input:focus{outline:none;border-color:var(--accent3);}
+
+.toast{position:fixed;bottom:20px;right:20px;background:var(--accent);color:#fff;padding:10px 16px;border-radius:var(--radius);font-size:13px;font-weight:500;z-index:9999;opacity:0;transform:translateY(10px);transition:all 0.3s;}
+.toast.show{opacity:1;transform:translateY(0);}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* Venta-producto section */
+.venta-prod-section{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;margin-top:10px;}
+.venta-prod-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-page" class="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div style="width:34px;height:34px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </div>
+      <span><span style="color:var(--text);">Forty</span><span style="color:var(--accent3);">App</span></span>
+    </div>
+    <div class="login-sub">Sistema de seguimiento comercial</div>
+    <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="admin@fortylex.com" /></div>
+    <div class="field"><label>Contraseña</label><input type="password" id="login-pass" placeholder="Tu contraseña" onkeydown="if(event.key==='Enter')doLogin()" /></div>
+    <div id="login-error" style="display:none;color:var(--red);font-size:12px;margin-top:8px;"></div>
+    <button class="btn btn-primary btn-full" id="login-btn" onclick="doLogin()" style="margin-top:10px;">Ingresar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-shell" class="app" style="display:none;">
+  <div class="sidebar">
+    <div class="sb-top">
+      <div class="sb-logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div>
+          <div class="sb-brand"><span>Forty</span><span class="logo-app">App</span></div>
+          <div class="sb-brand-sub">Fortylex · Comercial</div>
+        </div>
+      </div>
+      <button class="sb-toggle-btn" onclick="toggleSidebar()" title="Contraer / expandir menú">☰</button>
+    </div>
+    <div class="sb-nav" id="main-nav"></div>
+    <div class="sb-user">
+      <div class="avatar" id="topbar-avatar">GM</div>
+      <div class="sb-user-info">
+        <div class="sb-user-name" id="topbar-username">García, M.</div>
+        <div class="sb-user-role" id="topbar-role">Vendedor</div>
+      </div>
+      <button class="sb-logout" onclick="doLogout()" title="Cerrar sesión">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Salir
+      </button>
+    </div>
+  </div>
+  <div class="main-col">
+    <div class="topbar"><div class="topbar-title" id="page-title">FortyApp</div></div>
+    <div class="main" id="main-content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA LAYER ──
+// ── CONEXIÓN SUPABASE ──
+const SUPABASE_URL = 'https://uqaqsjydsieelnnkavha.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxYXFzanlkc2llZWxubmthdmhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODczNjEsImV4cCI6MjA5NjE2MzM2MX0.d_YLUItQLkimYAp87iY7jxbi85xorTsqAOQ9ayXE3pk';
+const SB = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentRole = 'vendedor';
+const ROLES = {
+  vendedor:   { label:'Vendedor',   nav:['nueva-visita','mis-visitas','mi-dashboard','historica'] },
+  supervisor: { label:'Supervisor', nav:['dashboard','mapa-calor','equipo','registros','catalogo','historica'] },
+  admin:      { label:'Admin',      nav:['dashboard','mapa-calor','equipo','registros','catalogo','usuarios','config','historica'] }
+};
+const NAV_LABELS = {
+  'nueva-visita':'Nueva visita','mis-visitas':'Mis visitas','mi-dashboard':'Mi rendimiento',
+  'dashboard':'Dashboard','mapa-calor':'Mapa de calor','equipo':'Equipo',
+  'registros':'Registros','catalogo':'Catálogo','usuarios':'Usuarios','config':'Configuración','historica':'Histórica'
+};
+
+// Catálogo editable (estructura global mutable)
+let CATALOGO = {
+  'Marca X': { productos: { 'Pepito Gr.':['Unidad','Pack x3','Caja x12'], 'Pepito Ch.':['Unidad','Pack x6'], 'Julito':['Unidad','Pack x4','Bulk'], 'Manolo Max':['Unidad','Caja x6'] } },
+  'Marca Y': { productos: { 'Rodolfo':['Unidad','Pack x2','Caja x10'], 'Brunito':['Unidad'], 'Carlitos':['Unidad','Pack x3'] } },
+  'Marca Z': { productos: { 'Primo':['Unidad','Pack x5'], 'Zurdo':['Unidad','Pack x2'], 'El Bueno':['Unidad','Pack x3','Caja x8'] } }
+};
+
+function getMarcas(){ return Object.keys(CATALOGO); }
+function getProductos(marca){ return Object.keys((CATALOGO[marca]||{}).productos||{}); }
+function getPresentaciones(marca,prod){ return ((CATALOGO[marca]||{}).productos||{})[prod]||['Unidad']; }
+
+const VENDEDORES = ['García, M.','López, R.','Torres, A.','Ramírez, C.','Medina, P.'];
+const CLIENTES = ['Supermercado El Sol','Almacén Don Pedro','Minimarket 24hs','Farmacia Central','Kiosco La Esquina','Supermercado Disco','Almacén Norte','Maxiconsumo','Tienda Rápida','Bazar El Centro'];
+const BARRIOS_SUGERIDOS = ['Pocitos','Punta Carretas','Centro','Cordón','Palermo','Carrasco','Malvín','Buceo','Prado','Aguada','Ciudad Vieja','Tres Cruces','Flor de Maroñas','Unión','Maroñas'];
+
+function genVisitas(){
+  const v=[]; const today=new Date();
+  for(let i=89;i>=0;i--){
+    const d=new Date(today); d.setDate(d.getDate()-i);
+    const dow=d.getDay(); if(dow===0) continue;
+    const count=dow===6?Math.floor(Math.random()*3)+1:Math.floor(Math.random()*8)+3;
+    const marcas=getMarcas();
+    for(let j=0;j<count;j++){
+      const vend=VENDEDORES[Math.floor(Math.random()*VENDEDORES.length)];
+      const barrio=BARRIOS_SUGERIDOS[Math.floor(Math.random()*BARRIOS_SUGERIDOS.length)];
+      const venta=Math.random()<0.62;
+      const hayFacing=Math.random()<0.75;
+      const prods=[];
+      if(hayFacing){
+        const marcaName=marcas[Math.floor(Math.random()*marcas.length)];
+        const prodList=getProductos(marcaName);
+        const numProds=Math.min(Math.floor(Math.random()*3)+1,prodList.length);
+        for(let p=0;p<numProds;p++){
+          const prodName=prodList[p];
+          const pres=getPresentaciones(marcaName,prodName);
+          const total=Math.floor(Math.random()*10)+1;
+          const detalle=[];let rem=total;
+          pres.forEach((pr,pi)=>{
+            const c=pi===pres.length-1?rem:Math.floor(Math.random()*rem);
+            if(c>0){detalle.push({presentacion:pr,cantidad:c});rem-=c;}
+          });
+          prods.push({nombre:prodName,marca:marcaName,total,detalle});
+        }
+      }
+      const marcaVenta=venta?marcas[Math.floor(Math.random()*marcas.length)]:'';
+      const prodVentaList=marcaVenta?getProductos(marcaVenta):[];
+      const prodVenta=prodVentaList.length?prodVentaList[Math.floor(Math.random()*prodVentaList.length)]:'';
+      const presVenta=prodVenta?getPresentaciones(marcaVenta,prodVenta):[];
+      const presVentaSel=presVenta.length?presVenta[Math.floor(Math.random()*presVenta.length)]:'';
+      const cliente=CLIENTES[Math.floor(Math.random()*CLIENTES.length)];
+      v.push({
+        id:'V'+String(v.length+1).padStart(4,'0'),
+        fecha:d.toISOString().slice(0,10),vendedor:vend,barrio,cliente,
+        calle:['Gral. Hornos','18 de Julio','Colonia','Rivera','Agraciada','Goes','Propios','Garibaldi','Pablo de María','Duvimioso Terra'][Math.floor(Math.random()*10)],
+        numero:String(Math.floor(Math.random()*3000)+100),
+        lat:-34.88+(Math.random()-0.5)*0.08,lng:-56.17+(Math.random()-0.5)*0.12,
+        venta,marcaVenta,prodVenta,presVenta:presVentaSel,
+        hayFacing,productos:prods,totalFacing:prods.reduce((s,p)=>s+p.total,0)
+      });
+    }
+  }
+  return v;
+}
+let VISITAS=genVisitas();
+
+function getToday(){return new Date().toISOString().slice(0,10);}
+function getThisMonth(){return new Date().toISOString().slice(0,7);}
+function isSameMonth(d,m){return d.startsWith(m);}
+function visitasFiltradas(filtros={}){
+  return VISITAS.filter(v=>{
+    if(filtros.vendedor&&v.vendedor!==filtros.vendedor)return false;
+    if(filtros.desde&&v.fecha<filtros.desde)return false;
+    if(filtros.hasta&&v.fecha>filtros.hasta)return false;
+    if(filtros.barrio&&!v.barrio.toLowerCase().includes(filtros.barrio.toLowerCase()))return false;
+    if(filtros.marca&&v.productos.every(p=>p.marca!==filtros.marca))return false;
+    if(filtros.cliente&&v.cliente!==filtros.cliente)return false;
+    return true;
+  });
+}
+
+// ── AUTH ──
+const USUARIOS_SISTEMA = [
+  {nombre:'García, M.',  iniciales:'GM', rol:'vendedor',   vendedor:'García, M.'},
+  {nombre:'López, R.',   iniciales:'LR', rol:'vendedor',   vendedor:'López, R.'},
+  {nombre:'Torres, A.',  iniciales:'TA', rol:'vendedor',   vendedor:'Torres, A.'},
+  {nombre:'Ramírez, C.', iniciales:'RC', rol:'vendedor',   vendedor:'Ramírez, C.'},
+  {nombre:'Medina, P.',  iniciales:'MP', rol:'vendedor',   vendedor:'Medina, P.'},
+  {nombre:'Supervisor 1',iniciales:'SV', rol:'supervisor', vendedor:null},
+  {nombre:'Admin',       iniciales:'AD', rol:'admin',      vendedor:null},
+];
+let currentUser = USUARIOS_SISTEMA[0];
+
+function initialsFrom(nombre){ return (nombre||'?').split(/[ ,]+/).filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase(); }
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  const errEl=document.getElementById('login-error');
+  const btn=document.getElementById('login-btn');
+  errEl.style.display='none';
+  if(!email||!pass){ errEl.textContent='Ingresá email y contraseña.'; errEl.style.display='block'; return; }
+  btn.disabled=true; btn.textContent='Ingresando…';
+  try{
+    const {data,error}=await SB.from('usuarios').select('*').ilike('email',email).maybeSingle();
+    if(error) throw error;
+    if(!data){ errEl.textContent='No existe un usuario con ese email.'; errEl.style.display='block'; return; }
+    if(data.password!==pass){ errEl.textContent='Contraseña incorrecta.'; errEl.style.display='block'; return; }
+    if(data.activo===false){ errEl.textContent='Tu usuario está inactivo. Contactá al administrador.'; errEl.style.display='block'; return; }
+    currentUser={ nombre:data.nombre, iniciales:data.iniciales||initialsFrom(data.nombre), rol:data.rol, vendedor:data.vendedor };
+    currentRole=data.rol;
+    await loadCatalogoFromDB();
+    VISITAS=genVisitas();            // datos de ejemplo usando ya tus marcas reales (visitas reales = próxima etapa)
+    document.getElementById('login-page').style.display='none';
+    document.getElementById('app-shell').style.display='flex';
+    applyCurrentUser();
+    navigate(ROLES[currentRole].nav[0]);
+  }catch(e){
+    errEl.textContent='Error conectando con la base ('+(e.message||e)+').';
+    errEl.style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent='Ingresar';
+  }
+}
+function applyCurrentUser(){
+  buildNav();
+  document.getElementById('topbar-role').textContent=ROLES[currentRole].label;
+  document.getElementById('topbar-avatar').textContent=currentUser.iniciales;
+  document.getElementById('topbar-username').textContent=currentUser.nombre;
+}
+function doLogout(){
+  document.getElementById('app-shell').style.display='none';
+  document.getElementById('login-page').style.display='flex';
+}
+
+// ── NAV ──
+let currentPage='';
+const NAV_ICONS={'nueva-visita':'📝','mis-visitas':'📋','mi-dashboard':'📈','dashboard':'📊','mapa-calor':'🗺️','equipo':'👥','registros':'🗂️','catalogo':'📦','usuarios':'👤','config':'⚙️','historica':'🗓️'};
+function toggleSidebar(){ document.querySelector('.sidebar').classList.toggle('collapsed'); }
+function buildNav(){
+  const nav=document.getElementById('main-nav'); nav.innerHTML='';
+  ROLES[currentRole].nav.forEach(id=>{
+    const btn=document.createElement('button');
+    btn.className='nav-item'; btn.dataset.page=id; btn.onclick=()=>navigate(id); btn.title=NAV_LABELS[id];
+    btn.innerHTML=`<span class="ni-icon">${NAV_ICONS[id]||'•'}</span><span class="ni-label">${NAV_LABELS[id]}</span>`;
+    nav.appendChild(btn);
+  });
+}
+function navigate(pageId){
+  currentPage=pageId;
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===pageId));
+  const pt=document.getElementById('page-title'); if(pt) pt.textContent=NAV_LABELS[pageId]||'FortyApp';
+  const content=document.getElementById('main-content'); content.innerHTML='';
+  const renders={
+    'nueva-visita':renderNuevaVisita,'mis-visitas':renderMisVisitas,'mi-dashboard':renderMiDashboard,
+    'dashboard':renderDashboard,'mapa-calor':renderMapaCalor,'equipo':renderEquipo,
+    'registros':renderRegistros,'catalogo':renderCatalogo,'usuarios':renderUsuarios,'config':renderConfig,'historica':renderHistorica
+  };
+  if(renders[pageId]) renders[pageId](content);
+  setTimeout(()=>initCharts(pageId),50);
+}
+
+// ── HISTÓRICA ──
+// Presencia de una marca = (total de presencias de esa marca en la semana) / (clientes visitados en la semana)
+// Días de visitas = cantidad de días distintos de la semana con al menos una visita
+function weekStartMonday(dateStr){
+  const d=new Date(dateStr+'T00:00:00');
+  const off=(d.getDay()+6)%7;          // 0 = lunes
+  d.setDate(d.getDate()-off);
+  return d;
+}
+function fmtDM(d){ return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
+function buildHistorica(){
+  const marcas=getMarcas();
+  const weeks={};
+  VISITAS.forEach(v=>{
+    const ws=weekStartMonday(v.fecha);
+    const key=ws.toISOString().slice(0,10);
+    if(!weeks[key]) weeks[key]={start:ws, vend:{}};
+    const w=weeks[key];
+    if(!w.vend[v.vendedor]) w.vend[v.vendedor]={clientes:0, presCount:{}, ventas:0, dias:new Set()};
+    const r=w.vend[v.vendedor];
+    r.clientes++;                                   // cada visita = un cliente visitado
+    if(v.venta) r.ventas++;
+    r.dias.add(v.fecha);
+    const presentes=new Set((v.productos||[]).map(p=>p.marca));   // marcas con presencia en esa visita
+    presentes.forEach(m=>{ r.presCount[m]=(r.presCount[m]||0)+1; });
+  });
+  return Object.keys(weeks).sort().map(key=>{
+    const w=weeks[key];
+    const end=new Date(w.start); end.setDate(end.getDate()+5);
+    const rows=Object.keys(w.vend).sort().map(vn=>{
+      const r=w.vend[vn];
+      const pres={};
+      marcas.forEach(m=>{ pres[m]= r.clientes ? (r.presCount[m]||0)/r.clientes : 0; });
+      return { vendedor:vn, clientes:r.clientes, pres, presCount:r.presCount, ventas:r.ventas, dias:r.dias.size };
+    });
+    return { label:fmtDM(w.start)+' a '+fmtDM(end), rows };
+  });
+}
+function renderHistorica(el){
+  const data=buildHistorica();
+  const marcas=getMarcas();
+  const isVend=currentRole==='vendedor';
+  const myName=currentUser.vendedor;
+  let html=`<div class="card"><div class="card-title">Rendimiento histórico semanal${isVend?' — '+myName:''}</div>
+  <div class="hm-scroll"><table class="v-table hist-table" style="min-width:${480+marcas.length*70}px">
+  <thead>
+    <tr>
+      <th rowspan="2">Semana</th>
+      <th rowspan="2">Desarrollador</th>
+      <th rowspan="2" style="text-align:center">Clientes</th>
+      <th colspan="${marcas.length}" style="text-align:center;border-left:1px solid rgba(255,255,255,0.18);border-right:1px solid rgba(255,255,255,0.18)">Presencias</th>
+      <th rowspan="2" style="text-align:center">Ventas</th>
+      <th rowspan="2" style="text-align:center">Días visitas</th>
+    </tr>
+    <tr>${marcas.map(m=>`<th style="text-align:center;font-size:9px;font-weight:500">${m}</th>`).join('')}</tr>
+  </thead><tbody>`;
+  data.forEach(wk=>{
+    let rows=wk.rows;
+    if(isVend) rows=rows.filter(r=>r.vendedor===myName);
+    if(!rows.length) return;
+    rows.forEach(r=>{
+      html+=`<tr>
+        <td style="font-size:11px;color:var(--text2);white-space:nowrap">${wk.label}</td>
+        <td style="font-weight:500">${r.vendedor}</td>
+        <td style="text-align:center">${r.clientes}</td>
+        ${marcas.map(m=>`<td style="text-align:center;font-family:var(--mono);font-size:12px">${r.pres[m].toFixed(2)}</td>`).join('')}
+        <td style="text-align:center;font-weight:600">${r.ventas}</td>
+        <td style="text-align:center">${r.dias}</td>
+      </tr>`;
+    });
+    if(!isVend && rows.length>1){
+      const totCli=rows.reduce((s,r)=>s+r.clientes,0);
+      const totVen=rows.reduce((s,r)=>s+r.ventas,0);
+      html+=`<tr class="hist-total">
+        <td></td><td>Total</td>
+        <td style="text-align:center">${totCli}</td>
+        ${marcas.map(m=>{ const pc=rows.reduce((s,r)=>s+(r.presCount[m]||0),0); const ratio=totCli?pc/totCli:0; return `<td style="text-align:center;font-family:var(--mono);font-size:12px">${ratio.toFixed(2)}</td>`; }).join('')}
+        <td style="text-align:center">${totVen}</td><td></td>
+      </tr>`;
+    }
+  });
+  html+=`</tbody></table></div></div>`;
+  el.innerHTML=html;
+}
+
+
+// ── NUEVA VISITA ──
+function renderNuevaVisita(el){
+  const now=new Date();
+  const dateStr=now.toISOString().slice(0,10);
+  const timeStr=now.toTimeString().slice(0,5);
+  el.innerHTML=`
+  <div class="card">
+    <div class="card-title">Nueva visita</div>
+    <div class="form-section">
+      <div class="form-section-title">Datos automáticos</div>
+      <div class="field-row">
+        <div class="field"><label>Fecha</label><div class="field-auto">${dateStr}</div></div>
+        <div class="field"><label>Hora</label><div class="field-auto">${timeStr}</div></div>
+      </div>
+      <div class="field"><label>Vendedor</label><div class="field-auto">${currentUser.nombre}</div></div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Punto de venta</div>
+      <div class="field">
+        <label>Barrio</label>
+        <input type="text" id="f-barrio" placeholder="Ej: Pocitos, Centro, Palermo…" list="barrios-datalist"/>
+        <datalist id="barrios-datalist">${BARRIOS_SUGERIDOS.map(b=>`<option value="${b}">`).join('')}</datalist>
+      </div>
+      <div class="field">
+        <label>Tipo</label>
+        <input type="text" id="f-tipo" placeholder="Ej: Autoservicio, Estación de servicio, Almacén…" list="tipos-datalist"/>
+        <datalist id="tipos-datalist"><option value="Autoservicio"><option value="Estación de servicio"><option value="Almacén"><option value="Kiosco"><option value="Supermercado"><option value="Minimercado"><option value="Farmacia"><option value="Bar/Restaurante"><option value="Mayorista"></datalist>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Calle</label><input type="text" id="f-calle" placeholder="Ej: Gral. Hornos, 18 de Julio…"/></div>
+        <div class="field"><label>Número</label><input type="text" id="f-num" placeholder="1234" style="max-width:100px;"/></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Resultado</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:10px;">
+        <span style="font-size:14px;font-weight:500;">¿Se concretó la venta?</span>
+        <label class="toggle" style="margin-left:12px;">
+          <input type="checkbox" id="f-venta" onchange="updateVentaLabel()">
+          <div class="toggle-track"></div><div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div id="venta-label" style="font-size:12px;color:var(--red);margin-bottom:12px;">✗ No concretada</div>
+
+      <!-- Sección marca/presentación de venta (aparece si hay venta) -->
+      <div id="venta-prod-section" style="display:none;">
+        <div class="venta-prod-section">
+          <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:10px;">Producto vendido</div>
+          <div class="venta-prod-row">
+            <div class="field" style="margin:0;">
+              <label>Marca</label>
+              <select id="venta-marca" onchange="updateVentaProds()">
+                <option value="">-- Marca --</option>
+                ${getMarcas().map(m=>`<option>${m}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field" style="margin:0;">
+              <label>Producto</label>
+              <select id="venta-prod" onchange="updateVentaPres()">
+                <option value="">-- Producto --</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" style="margin-top:10px;">
+            <label>Presentación</label>
+            <select id="venta-pres">
+              <option value="">-- Presentación --</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Facing en góndola</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--bg3);border-radius:var(--radius);">
+        <span style="font-size:14px;font-weight:500;">¿Hay facing?</span>
+        <label class="toggle">
+          <input type="checkbox" id="f-facing" onchange="toggleFacingSection()">
+          <div class="toggle-track"></div><div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div id="facing-section" style="display:none;margin-top:12px;">
+        <div class="facing-builder">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span style="font-size:12px;font-weight:500;color:var(--text2);">Productos relevados</span>
+            <button class="btn btn-secondary btn-sm" onclick="addProducto()">+ Agregar producto</button>
+          </div>
+          <div id="productos-list"></div>
+          <div id="facing-summary" style="margin-top:8px;font-size:12px;color:var(--text2);"></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="guardarVisita()">Guardar visita</button>
+  </div>`;
+}
+
+function updateVentaLabel(){
+  const cb=document.getElementById('f-venta');
+  const lbl=document.getElementById('venta-label');
+  const sec=document.getElementById('venta-prod-section');
+  lbl.textContent=cb.checked?'✓ Venta concretada':'✗ No concretada';
+  lbl.style.color=cb.checked?'var(--green)':'var(--red)';
+  sec.style.display=cb.checked?'block':'none';
+}
+function updateVentaProds(){
+  const marca=document.getElementById('venta-marca').value;
+  const prodSel=document.getElementById('venta-prod');
+  const prods=getProductos(marca);
+  prodSel.innerHTML=`<option value="">-- Producto --</option>`+prods.map(p=>`<option>${p}</option>`).join('');
+  document.getElementById('venta-pres').innerHTML=`<option value="">-- Presentación --</option>`;
+}
+function updateVentaPres(){
+  const marca=document.getElementById('venta-marca').value;
+  const prod=document.getElementById('venta-prod').value;
+  const presSel=document.getElementById('venta-pres');
+  const pres=getPresentaciones(marca,prod);
+  presSel.innerHTML=`<option value="">-- Presentación --</option>`+pres.map(p=>`<option>${p}</option>`).join('');
+}
+
+function toggleFacingSection(){
+  const show=document.getElementById('f-facing').checked;
+  document.getElementById('facing-section').style.display=show?'block':'none';
+  if(show&&document.getElementById('productos-list').children.length===0) addProducto();
+}
+
+let prodCount=0;
+function addProducto(){
+  prodCount++;
+  const id=prodCount;
+  const div=document.createElement('div');
+  div.className='product-block'; div.id=`prod-${id}`;
+  div.innerHTML=`
+    <button class="remove-btn" style="position:absolute;top:8px;right:8px;" onclick="removeProducto(${id})">✕</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div class="field" style="margin:0;"><label>Marca</label>
+        <select onchange="updateProds(${id},this.value)">
+          <option value="">-- Marca --</option>
+          ${getMarcas().map(m=>`<option>${m}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin:0;"><label>Producto</label>
+        <select id="prod-sel-${id}" onchange="updatePres(${id},this.value)">
+          <option value="">-- Producto --</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <div class="field" style="margin:0;flex:1;"><label>Total facing</label>
+        <input type="number" id="total-${id}" min="1" value="1" oninput="validateFacing(${id})"/>
+      </div>
+      <div id="facing-status-${id}" class="facing-total" style="margin-top:18px;">—</div>
+    </div>
+    <div id="pres-list-${id}">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Desglose por presentación:</div>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="addPres(${id})" style="margin-top:4px;">+ Presentación</button>`;
+  document.getElementById('productos-list').appendChild(div);
+  updateFacingSummary();
+}
+function removeProducto(id){ const el=document.getElementById(`prod-${id}`); if(el)el.remove(); updateFacingSummary(); }
+function updateProds(id,marca){
+  const sel=document.getElementById(`prod-sel-${id}`);
+  sel.innerHTML=`<option value="">-- Producto --</option>`+getProductos(marca).map(p=>`<option>${p}</option>`).join('');
+  document.getElementById(`pres-list-${id}`).querySelectorAll('.pres-row').forEach(r=>r.remove());
+}
+function updatePres(id,prod){
+  const marca=document.getElementById(`prod-sel-${id}`)?.closest('.product-block')?.querySelector('select')?.value||'';
+  const container=document.getElementById(`pres-list-${id}`);
+  container.querySelectorAll('.pres-row').forEach(r=>r.remove());
+  if(!prod)return;
+  const pres=getPresentaciones(marca,prod);
+  pres.forEach(p=>{
+    const row=document.createElement('div'); row.className='pres-row';
+    row.innerHTML=`
+      <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;">
+        ${pres.map(x=>`<option${x===p?' selected':''}>${x}</option>`).join('')}
+      </select>
+      <input type="number" min="0" value="1" style="width:60px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;" oninput="validateFacing(${id})"/>
+      <button class="remove-btn" onclick="this.closest('.pres-row').remove();validateFacing(${id})">✕</button>`;
+    container.appendChild(row);
+  });
+  validateFacing(id);
+}
+function addPres(id){
+  const container=document.getElementById(`pres-list-${id}`);
+  const marcaSel=document.getElementById(`prod-sel-${id}`)?.closest('.product-block')?.querySelector('select')?.value||'';
+  const prod=document.getElementById(`prod-sel-${id}`).value;
+  const pres=getPresentaciones(marcaSel,prod);
+  const row=document.createElement('div'); row.className='pres-row';
+  row.innerHTML=`
+    <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;">
+      ${pres.map(x=>`<option>${x}</option>`).join('')}
+    </select>
+    <input type="number" min="0" value="1" style="width:60px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;" oninput="validateFacing(${id})"/>
+    <button class="remove-btn" onclick="this.closest('.pres-row').remove();validateFacing(${id})">✕</button>`;
+  container.appendChild(row);
+  validateFacing(id);
+}
+function validateFacing(id){
+  const total=parseInt(document.getElementById(`total-${id}`).value)||0;
+  const rows=document.getElementById(`pres-list-${id}`).querySelectorAll('.pres-row');
+  let sum=0; rows.forEach(r=>{const inp=r.querySelectorAll('input')[0];if(inp)sum+=parseInt(inp.value)||0;});
+  const status=document.getElementById(`facing-status-${id}`);
+  if(rows.length===0){status.textContent='—';status.className='facing-total';}
+  else if(sum===total){status.innerHTML=`<span class="facing-ok">✓ ${sum}/${total}</span>`;status.className='facing-total';}
+  else{status.innerHTML=`<span class="facing-err">${sum}/${total}</span>`;status.className='facing-total';}
+  updateFacingSummary();
+}
+function updateFacingSummary(){
+  const blocks=document.querySelectorAll('.product-block');
+  let tot=0; blocks.forEach(b=>{const inp=b.querySelector('input[type=number]');if(inp)tot+=parseInt(inp.value)||0;});
+  const sumEl=document.getElementById('facing-summary');
+  if(sumEl)sumEl.textContent=`Total facing: ${tot} unidades en ${blocks.length} producto(s)`;
+}
+function guardarVisita(){ showToast('✓ Visita guardada correctamente'); setTimeout(()=>navigate('mis-visitas'),800); }
+
+// ── MIS VISITAS ──
+let misVisitasFiltros={mes:'',cliente:''};
+function renderMisVisitas(el){
+  const vendNombre=currentUser.vendedor||currentUser.nombre;
+  const mis=VISITAS.filter(v=>v.vendedor===vendNombre);
+
+  // Build month options from available data
+  const meses=[...new Set(mis.map(v=>v.fecha.slice(0,7)))].sort().reverse();
+  if(!misVisitasFiltros.mes && meses.length) misVisitasFiltros.mes=meses[0];
+
+  let filtradas=mis;
+  if(misVisitasFiltros.mes) filtradas=filtradas.filter(v=>v.fecha.startsWith(misVisitasFiltros.mes));
+  if(misVisitasFiltros.cliente) filtradas=filtradas.filter(v=>v.cliente===misVisitasFiltros.cliente);
+  filtradas=filtradas.slice().reverse();
+
+  const clientesMes=[...new Set(mis.filter(v=>!misVisitasFiltros.mes||v.fecha.startsWith(misVisitasFiltros.mes)).map(v=>v.cliente))].sort();
+
+  el.innerHTML=`
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+      <div class="card-title" style="margin:0;">Mis visitas — ${currentUser.nombre}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;" onchange="misVisitasFiltros.mes=this.value;renderMisVisitas(document.getElementById('main-content'))">
+          <option value="">Todos los meses</option>
+          ${meses.map(m=>`<option value="${m}"${misVisitasFiltros.mes===m?' selected':''}>${m}</option>`).join('')}
+        </select>
+        <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;" onchange="misVisitasFiltros.cliente=this.value;renderMisVisitas(document.getElementById('main-content'))">
+          <option value="">Todos los clientes</option>
+          ${clientesMes.map(c=>`<option value="${c}"${misVisitasFiltros.cliente===c?' selected':''}>${c}</option>`).join('')}
+        </select>
+        <span style="font-size:12px;color:var(--text3);">${filtradas.length} visitas</span>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="v-table" style="min-width:560px;">
+      <thead><tr><th>Fecha</th><th>Cliente</th><th>Barrio</th><th>Venta</th><th>Producto vendido</th><th>Facing</th></tr></thead>
+      <tbody>${filtradas.length?filtradas.map(v=>`<tr>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--text2);">${v.fecha}</td>
+        <td style="font-size:12px;font-weight:500;">${v.cliente||'—'}</td>
+        <td>${v.barrio}<br><span style="font-size:10px;color:var(--text3);">${v.calle} ${v.numero}</span></td>
+        <td><span class="badge ${v.venta?'badge-green':'badge-red'}">${v.venta?'Sí':'No'}</span></td>
+        <td style="font-size:11px;color:var(--text2);">${v.venta&&v.marcaVenta?`${v.marcaVenta} / ${v.prodVenta}<br><span style="color:var(--text3);">${v.presVenta}</span>`:'—'}</td>
+        <td style="font-family:var(--mono);">${v.hayFacing?v.totalFacing:'—'}</td>
+      </tr>`).join(''):`<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px;">Sin visitas para este período</td></tr>`}</tbody>
+    </table>
+    </div>
+  </div>`;
+}
+
+// ── MI DASHBOARD ──
+let miDashFiltros={cliente:'',marca:'',producto:''};
+function renderMiDashboard(el){
+  const vendNombre=currentUser.vendedor||currentUser.nombre;
+  const mes=getThisMonth();
+  const todas=VISITAS.filter(v=>v.vendedor===vendNombre);
+
+  // Apply filters
+  let mis=todas;
+  if(miDashFiltros.cliente) mis=mis.filter(v=>v.cliente===miDashFiltros.cliente);
+  if(miDashFiltros.marca) mis=mis.filter(v=>v.marcaVenta===miDashFiltros.marca||v.productos.some(p=>p.marca===miDashFiltros.marca));
+  if(miDashFiltros.producto) mis=mis.filter(v=>v.prodVenta===miDashFiltros.producto||v.productos.some(p=>p.nombre===miDashFiltros.producto));
+
+  const mes_vis=mis.filter(v=>isSameMonth(v.fecha,mes));
+  const hoy=mis.filter(v=>v.fecha===getToday());
+  const totalMes=mes_vis.length;
+  const ventas=mes_vis.filter(v=>v.venta).length;
+  const conv=totalMes?Math.round(ventas/totalMes*100):0;
+  const conFacing=mes_vis.filter(v=>v.hayFacing).length;
+  const sinFacing=totalMes-conFacing;
+  const diasHabiles=22;
+  const promDia=totalMes?(totalMes/22).toFixed(1):0;
+  const diasPasados=new Date().getDate();
+  const progreso=Math.min(100,Math.round(totalMes/diasHabiles*100));
+  const facingTotal=mes_vis.reduce((s,v)=>s+v.totalFacing,0);
+  const days=[]; const today=new Date();
+  for(let i=13;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+  const dailyCounts=days.map(d=>mis.filter(v=>v.fecha===d).length);
+  const maxDaily=Math.max(...dailyCounts,1);
+
+  // Options for filters
+  const clientesDisp=[...new Set(todas.map(v=>v.cliente))].filter(Boolean).sort();
+  const marcasDisp=getMarcas();
+  const prodsDisp=miDashFiltros.marca?getProductos(miDashFiltros.marca):[...new Set(todas.flatMap(v=>v.productos.map(p=>p.nombre)))].sort();
+
+  el.innerHTML=`
+  <div style="display:grid;gap:12px;">
+    <!-- Filtros -->
+    <div class="card" style="padding:12px 16px;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:8px;">Filtrar mi rendimiento</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;flex:1;min-width:130px;" onchange="miDashFiltros.cliente=this.value;renderMiDashboard(document.getElementById('main-content'))">
+          <option value="">Todos los clientes</option>
+          ${clientesDisp.map(c=>`<option value="${c}"${miDashFiltros.cliente===c?' selected':''}>${c}</option>`).join('')}
+        </select>
+        <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;flex:1;min-width:120px;" onchange="miDashFiltros.marca=this.value;miDashFiltros.producto='';renderMiDashboard(document.getElementById('main-content'))">
+          <option value="">Todas las marcas</option>
+          ${marcasDisp.map(m=>`<option value="${m}"${miDashFiltros.marca===m?' selected':''}>${m}</option>`).join('')}
+        </select>
+        <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;flex:1;min-width:130px;" onchange="miDashFiltros.producto=this.value;renderMiDashboard(document.getElementById('main-content'))">
+          <option value="">Todos los productos</option>
+          ${prodsDisp.map(p=>`<option value="${p}"${miDashFiltros.producto===p?' selected':''}>${p}</option>`).join('')}
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="miDashFiltros={cliente:'',marca:'',producto:''};renderMiDashboard(document.getElementById('main-content'))">Limpiar</button>
+      </div>
+    </div>
+
+    <div class="kpi-grid" style="grid-template-columns:repeat(2,1fr);">
+      <div class="kpi" style="--kpi-color:var(--accent3);"><div class="kpi-label">Visitas hoy</div><div class="kpi-val">${hoy.length}</div><div class="kpi-sub">meta diaria: ~7</div></div>
+      <div class="kpi" style="--kpi-color:var(--green);"><div class="kpi-label">Visitas del mes</div><div class="kpi-val">${totalMes}</div><div class="kpi-sub">${diasPasados} días transcurridos</div></div>
+      <div class="kpi" style="--kpi-color:var(--amber);"><div class="kpi-label">Prom. visitas/día</div><div class="kpi-val">${promDia}</div><div class="kpi-sub">en días transcurridos</div></div>
+      <div class="kpi" style="--kpi-color:var(--teal);"><div class="kpi-label">Conversión mes</div><div class="kpi-val">${conv}%</div><div class="kpi-sub">${ventas} ventas / ${totalMes} visitas</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Progreso acumulado del mes</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:6px;"><span>${totalMes} visitas realizadas</span><span style="font-family:var(--mono);">${progreso}%</span></div>
+      <div class="month-bar"><div class="month-fill" style="width:${progreso}%"></div></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;">Meta estimada ${diasHabiles} visitas/mes</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Visitas diarias — últimos 14 días</div>
+      <div class="timeline">${dailyCounts.map((c,i)=>`<div class="tl-bar" style="height:${Math.max(4,Math.round(c/maxDaily*52))}px;opacity:${c>0?0.7:0.2};" title="${days[i]}: ${c} visitas"></div>`).join('')}</div>
+      <div class="tl-labels"><span>${days[0].slice(5)}</span><span>${days[6].slice(5)}</span><span>${days[13].slice(5)}</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Facing del mes</div>
+      <div class="stat-row">
+        <div class="stat-mini"><div class="stat-mini-val" style="color:var(--teal);">${facingTotal}</div><div class="stat-mini-lbl">Total facing</div></div>
+        <div class="stat-mini"><div class="stat-mini-val" style="color:var(--green);">${conFacing}</div><div class="stat-mini-lbl">Con facing</div></div>
+        <div class="stat-mini"><div class="stat-mini-val" style="color:var(--red);">${sinFacing}</div><div class="stat-mini-lbl">Sin facing</div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── DASHBOARD supervisor/admin ──
+let dashFilters={desde:'',hasta:'',vendedor:'',barrio:'',marca:'',cliente:''};
+function renderDashboard(el){
+  const mes=getThisMonth();
+  const vis=visitasFiltradas(dashFilters);
+  const mesFilt=vis.filter(v=>isSameMonth(v.fecha,mes));
+  const total=mesFilt.length;
+  const ventas=mesFilt.filter(v=>v.venta).length;
+  const conv=total?Math.round(ventas/total*100):0;
+  const conFacing=mesFilt.filter(v=>v.hayFacing).length;
+  const sinFacing=total-conFacing;
+  const facingTotal=mesFilt.reduce((s,v)=>s+v.totalFacing,0);
+  const hoyAll=vis.filter(v=>v.fecha===getToday());
+  const diasMes=new Date().getDate();
+  const promDia=(total/diasMes).toFixed(1);
+  const days30=[]; const today30=new Date();
+  for(let i=29;i>=0;i--){const d=new Date(today30);d.setDate(d.getDate()-i);days30.push(d.toISOString().slice(0,10));}
+  const dailyV=days30.map(d=>vis.filter(v=>v.fecha===d).length);
+  const dailySales=days30.map(d=>vis.filter(v=>v.fecha===d&&v.venta).length);
+  const facingMarca={};
+  mesFilt.forEach(v=>v.productos.forEach(p=>{facingMarca[p.marca]=(facingMarca[p.marca]||0)+p.total;}));
+  const byBarrio={};
+  mesFilt.forEach(v=>{byBarrio[v.barrio]=(byBarrio[v.barrio]||0)+1;});
+  const topBarrios=Object.entries(byBarrio).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  el.innerHTML=`
+  <div class="filters">
+    <select onchange="dashFilters.vendedor=this.value;navigate('dashboard')">
+      <option value="">Todos los vendedores</option>
+      ${VENDEDORES.map(v=>`<option${dashFilters.vendedor===v?' selected':''}>${v}</option>`).join('')}
+    </select>
+    <select onchange="dashFilters.cliente=this.value;navigate('dashboard')">
+      <option value="">Todos los clientes</option>
+      ${CLIENTES.map(c=>`<option${dashFilters.cliente===c?' selected':''}>${c}</option>`).join('')}
+    </select>
+    <input type="text" placeholder="Filtrar barrio…" value="${dashFilters.barrio}" oninput="dashFilters.barrio=this.value;navigate('dashboard')" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;"/>
+    <select onchange="dashFilters.marca=this.value;navigate('dashboard')">
+      <option value="">Todas las marcas</option>
+      ${getMarcas().map(m=>`<option${dashFilters.marca===m?' selected':''}>${m}</option>`).join('')}
+    </select>
+    <button class="btn btn-secondary btn-sm" onclick="dashFilters={desde:'',hasta:'',vendedor:'',barrio:'',marca:'',cliente:''};navigate('dashboard')">Limpiar</button>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi" style="--kpi-color:var(--accent3);"><div class="kpi-label">Visitas hoy</div><div class="kpi-val">${hoyAll.length}</div><div class="kpi-delta up">↑ ${new Set(hoyAll.map(v=>v.vendedor)).size} vendedores activos</div></div>
+    <div class="kpi" style="--kpi-color:var(--green);"><div class="kpi-label">Visitas del mes</div><div class="kpi-val">${total}</div><div class="kpi-sub">acumuladas</div></div>
+    <div class="kpi" style="--kpi-color:var(--amber);"><div class="kpi-label">Prom./día</div><div class="kpi-val">${promDia}</div><div class="kpi-sub">${diasMes} días</div></div>
+    <div class="kpi" style="--kpi-color:var(--teal);"><div class="kpi-label">Ventas del mes</div><div class="kpi-val">${ventas}</div><div class="kpi-sub">de ${total} visitas</div></div>
+    <div class="kpi" style="--kpi-color:var(--purple);cursor:help;" title="Conversión = % de visitas donde se cerró una venta. Ej: 65% significa que en 65 de cada 100 visitas el vendedor logró vender.">
+      <div class="kpi-label">Conversión <span style="color:var(--text3);font-size:9px;">(?)</span></div>
+      <div class="kpi-val">${conv}%</div>
+      <div class="kpi-delta ${conv>=65?'up':'down'}">${conv>=65?'↑ sobre meta':'↓ bajo meta (65%)'}</div>
+    </div>
+    <div class="kpi" style="--kpi-color:var(--red);"><div class="kpi-label">Sin facing</div><div class="kpi-val">${sinFacing}</div><div class="kpi-sub">${total?Math.round(sinFacing/total*100):0}% sin cobertura</div></div>
+  </div>
+  <!-- Tooltip explicativo debajo de KPIs -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+    <div style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.2);border-radius:var(--radius);padding:10px 14px;">
+      <div style="font-size:11px;font-weight:600;color:var(--purple);margin-bottom:4px;">¿Qué es la Conversión?</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.5;">Es el porcentaje de visitas donde se concretó una venta. Si un vendedor hizo 10 visitas y cerró 7 ventas, su conversión es <strong style="color:var(--text);">70%</strong>. La meta del equipo es <strong style="color:var(--text);">65%</strong>.</div>
+    </div>
+    <div style="background:rgba(34,201,147,0.08);border:1px solid rgba(34,201,147,0.2);border-radius:var(--radius);padding:10px 14px;">
+      <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:4px;">¿Qué es la Cobertura de Facing?</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.5;">Es el % de visitas donde el vendedor relevó el facing (espacio del producto en góndola). Si no hay facing registrado, esa visita queda <strong style="color:var(--text);">"sin cobertura"</strong>. Alta cobertura = mejor visibilidad de datos.</div>
+    </div>
+  </div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px;">
+    <div class="kpi" style="--kpi-color:var(--teal);"><div class="kpi-label">Total facing mes</div><div class="kpi-val">${facingTotal.toLocaleString()}</div><div class="kpi-sub">unidades relevadas</div></div>
+    <div class="kpi" style="--kpi-color:var(--green);cursor:help;" title="Cobertura = % de visitas con facing registrado. 100% significa que en todas las visitas se relevó el espacio en góndola."><div class="kpi-label">Con facing <span style="color:var(--text3);font-size:9px;">(?)</span></div><div class="kpi-val">${conFacing}</div><div class="kpi-sub">${total?Math.round(conFacing/total*100):0}% cobertura</div></div>
+    <div class="kpi" style="--kpi-color:var(--amber);"><div class="kpi-label">Facing promedio</div><div class="kpi-val">${conFacing?Math.round(facingTotal/conFacing):0}</div><div class="kpi-sub">unid. por visita</div></div>
+  </div>
+  <div class="charts-row">
+    <div class="card"><div class="card-title">Visitas diarias — 30 días</div><div class="chart-wrap"><canvas id="ch-daily"></canvas></div></div>
+    <div class="card"><div class="card-title">Facing por marca (mes)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">${Object.entries(facingMarca).map((e,i)=>`<span style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:${['#c0392b','#0ea15a','#e08c00'][i%3]};display:inline-block;"></span>${e[0]}: ${e[1]}</span>`).join('')}</div>
+      <div class="chart-wrap"><canvas id="ch-marca"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-row">
+    <div class="card"><div class="card-title">Top barrios — visitas del mes</div><div class="chart-wrap" style="height:180px;"><canvas id="ch-barrio"></canvas></div></div>
+    <div class="card"><div class="card-title">Conversión diaria</div><div class="chart-wrap"><canvas id="ch-conv"></canvas></div></div>
+  </div>
+  <div style="font-size:11px;color:var(--text3);text-align:right;margin-bottom:8px;">
+    <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ Exportar CSV</button>
+  </div>`;
+
+  window.__dailyData={days30,dailyV,dailySales,facingMarca,topBarrios};
+}
+
+function initCharts(pageId){
+  if(pageId==='dashboard'&&window.__dailyData){
+    const {days30,dailyV,dailySales,facingMarca,topBarrios}=window.__dailyData;
+    const labels=days30.map(d=>d.slice(5));
+    const cfg={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'rgba(0,0,0,0.06)'},ticks:{color:'#999999',font:{size:10},maxTicksLimit:8}},
+              y:{grid:{color:'rgba(0,0,0,0.06)'},ticks:{color:'#999999',font:{size:10}}}}};    if(document.getElementById('ch-daily'))
+      new Chart(document.getElementById('ch-daily'),{type:'bar',data:{labels,datasets:[
+        {label:'Visitas',data:dailyV,backgroundColor:'rgba(192,57,43,0.6)',borderRadius:3},
+        {label:'Ventas',data:dailySales,backgroundColor:'rgba(34,201,147,0.6)',borderRadius:3}
+      ]},options:{...cfg}});
+    if(document.getElementById('ch-marca')){
+      const mk=Object.keys(facingMarca),mv=Object.values(facingMarca);
+      new Chart(document.getElementById('ch-marca'),{type:'doughnut',data:{labels:mk,datasets:[{data:mv,backgroundColor:['#c0392b','#0ea15a','#e08c00'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'62%'}});
+    }
+    if(document.getElementById('ch-barrio')&&topBarrios.length)
+      new Chart(document.getElementById('ch-barrio'),{type:'bar',data:{labels:topBarrios.map(b=>b[0]),datasets:[{data:topBarrios.map(b=>b[1]),backgroundColor:'rgba(192,57,43,0.5)',borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(0,0,0,0.06)'},ticks:{color:'#999999',font:{size:10}}},y:{grid:{display:false},ticks:{color:'#666666',font:{size:11}}}}}});
+    if(document.getElementById('ch-conv')){
+      const convData=days30.map((_,i)=>dailyV[i]>0?Math.round(dailySales[i]/dailyV[i]*100):null);
+      new Chart(document.getElementById('ch-conv'),{type:'line',data:{labels,datasets:[{data:convData,borderColor:'#e08c00',backgroundColor:'rgba(245,158,42,0.1)',tension:0.4,fill:true,pointRadius:2,spanGaps:true}]},options:{...cfg}});
+    }
+  }
+}
+
+// ── MAPA DE CALOR ──
+let hmMetric='visitas';
+// Color scales: LOW = red, HIGH = green (invertido del original)
+const HM_COLORS = {
+  visitas: ['#3d0a0a','#6e1010','#c04020','#e07030','#8fc940','#0ea15a'],
+  ventas:  ['#3d0a0a','#6e1010','#a93226','#e07030','#7ec940','#0c8a4d'],
+  facing:  ['#2a0d0d','#5a1a10','#8a3010','#c06020','#d4a030','#f0d060'],
+  conv:    ['#1a0a2e','#3a1060','#6e1a8c','#a030b0','#c060d0','#e090f0']
+};
+
+function hmColorForValue(v, max, metric){
+  if(v===0) return 'var(--bg3)';
+  const colors=HM_COLORS[metric];
+  const idx=Math.min(5,Math.floor((v/max)*5.99));
+  return colors[idx];
+}
+
+function buildHmData(mesFilt){
+  const días=['Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const getWeekday=d=>{const w=new Date(d+'T12:00:00').getDay();return w===0?null:w-1;};
+  const matrix={};VENDEDORES.forEach(v=>{matrix[v]=Array(6).fill(0);});
+  const sales={};VENDEDORES.forEach(v=>{sales[v]=Array(6).fill(0);});
+  const facing={};VENDEDORES.forEach(v=>{facing[v]=Array(6).fill(0);});
+  mesFilt.forEach(v=>{
+    const wd=getWeekday(v.fecha); if(wd===null||wd>=6)return;
+    matrix[v.vendedor][wd]++;
+    if(v.venta)sales[v.vendedor][wd]++;
+    facing[v.vendedor][wd]+=v.totalFacing;
+  });
+  const conv={};
+  VENDEDORES.forEach(v=>{conv[v]=días.map((_,i)=>matrix[v][i]>0?Math.round(sales[v][i]/matrix[v][i]*100):0);});
+  return {matrix,sales,facing,conv,días};
+}
+
+function renderMapaCalor(el){
+  const mes=getThisMonth();
+  const mesFilt=VISITAS.filter(v=>isSameMonth(v.fecha,mes));
+  window.__hmMesFilt=mesFilt;
+  window.__hmDrillOpen=false;
+
+  el.innerHTML=`
+  <div style="display:grid;gap:12px;">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+        <div class="card-title" style="margin:0;">Mapa de calor — Desarrollador × Día (mes actual)</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="hm-tab active" id="hmt-visitas" onclick="setHmMetric('visitas',this)">Visitas</button>
+          <button class="hm-tab" id="hmt-ventas"  onclick="setHmMetric('ventas',this)">Ventas</button>
+          <button class="hm-tab" id="hmt-facing"  onclick="setHmMetric('facing',this)">Facing</button>
+          <button class="hm-tab" id="hmt-conv"    onclick="setHmMetric('conv',this)">Conversión %</button>
+        </div>
+      </div>
+      <div class="hm-scroll" id="hm-container"></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:10px;color:var(--text3);">
+        <span>Bajo</span>
+        <div id="hm-legend-swatches" style="display:flex;gap:3px;"></div>
+        <span>Alto</span>
+        <span style="margin-left:12px;color:var(--text3);">· Hacé clic en una celda para ver el desglose por barrio</span>
+      </div>
+    </div>
+
+    <!-- Panel de drill-down -->
+    <div class="card" id="drill-panel" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div id="drill-title" class="card-title" style="margin:0;"></div>
+        <button class="btn btn-secondary btn-sm" onclick="closeDrill()">✕ Cerrar</button>
+      </div>
+      <div id="drill-content"></div>
+    </div>
+
+    <!-- Mapa geográfico -->
+    <div class="card">
+      <div class="card-title">Distribución geográfica — Montevideo</div>
+      <div class="map-mock"><canvas id="geo-canvas"></canvas><div class="map-overlay" id="map-overlay">Montevideo — ${mesFilt.length} visitas</div></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px;">Verde = venta · Rojo = sin venta · Tamaño = facing</div>
+    </div>
+  </div>`;
+
+  buildHmTable('visitas');
+  setTimeout(()=>drawGeoMap(mesFilt),50);
+}
+
+function buildHmTable(metric){
+  const mesFilt=window.__hmMesFilt||[];
+  const {matrix,sales,facing,conv,días}=buildHmData(mesFilt);
+  const dataMap={visitas:matrix,ventas:sales,facing,conv};
+  const d=dataMap[metric];
+  const flat=VENDEDORES.flatMap(v=>d[v]);
+  const max=Math.max(...flat,1);
+  const colors=HM_COLORS[metric];
+
+  let html=`<table class="hm-table"><thead><tr><th style="text-align:left;padding-left:4px;">Desarrollador</th>${días.map(dia=>`<th>${dia}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+  VENDEDORES.forEach(vend=>{
+    const nombre=vend.split(',')[0];
+    const vals=d[vend];
+    const total=vals.reduce((s,x)=>s+x,0);
+    html+=`<tr><td class="row-label" style="font-weight:500;color:var(--text);">${nombre}</td>`;
+    vals.forEach((val,di)=>{
+      const bg=hmColorForValue(val,max,metric);
+      const bright=val>0&&(val/max)>0.5;
+      const tc=bright?'rgba(255,255,255,0.95)':'rgba(255,255,255,0.55)';
+      const label=metric==='conv'&&val>0?val+'%':val||'';
+      html+=`<td class="hm-cell" style="background:${bg};color:${tc};" onclick="openDrill('${vend}',${di},'${días[di]}')" title="${vend} ${días[di]}: ${val}">${label}</td>`;
+    });
+    html+=`<td style="font-family:var(--mono);font-size:12px;color:var(--text2);text-align:center;padding:4px 8px;">${total}</td></tr>`;
+  });
+  html+='</tbody></table>';
+
+  document.getElementById('hm-container').innerHTML=html;
+
+  // legend swatches
+  const sw=document.getElementById('hm-legend-swatches');
+  if(sw) sw.innerHTML=colors.map(c=>`<div style="width:18px;height:10px;border-radius:2px;background:${c};"></div>`).join('');
+}
+
+function setHmMetric(m,btn){
+  hmMetric=m;
+  document.querySelectorAll('.hm-tab').forEach(t=>t.classList.remove('active')); btn.classList.add('active');
+  buildHmTable(m);
+}
+
+function openDrill(vendedor,diIdx,diaNombre){
+  const mesFilt=window.__hmMesFilt||[];
+  const getWeekday=d=>{const w=new Date(d+'T12:00:00').getDay();return w===0?null:w-1;};
+  const visDelDia=mesFilt.filter(v=>v.vendedor===vendedor && getWeekday(v.fecha)===diIdx);
+
+  const panel=document.getElementById('drill-panel');
+  const title=document.getElementById('drill-title');
+  const content=document.getElementById('drill-content');
+
+  const nombre=vendedor.split(',')[0].trim();
+  title.textContent=`${nombre} — ${diaNombre} (${visDelDia.length} visitas)`;
+  panel.style.display='block';
+
+  if(visDelDia.length===0){
+    content.innerHTML=`<p style="color:var(--text2);font-size:13px;">Sin visitas registradas este día.</p>`;
+    return;
+  }
+
+  // Agrupar por barrio
+  const byBarrio={};
+  visDelDia.forEach(v=>{
+    if(!byBarrio[v.barrio]) byBarrio[v.barrio]={visitas:0,ventas:0,facing:0};
+    byBarrio[v.barrio].visitas++;
+    if(v.venta) byBarrio[v.barrio].ventas++;
+    byBarrio[v.barrio].facing+=v.totalFacing;
+  });
+  const sorted=Object.entries(byBarrio).sort((a,b)=>b[1].visitas-a[1].visitas);
+  const maxV=Math.max(...sorted.map(e=>e[1].visitas));
+
+  let html=`
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+    <div class="stat-mini"><div class="stat-mini-val" style="color:var(--accent3);">${visDelDia.length}</div><div class="stat-mini-lbl">Visitas totales</div></div>
+    <div class="stat-mini"><div class="stat-mini-val" style="color:var(--green);">${visDelDia.filter(v=>v.venta).length}</div><div class="stat-mini-lbl">Ventas</div></div>
+    <div class="stat-mini"><div class="stat-mini-val" style="color:var(--teal);">${visDelDia.reduce((s,v)=>s+v.totalFacing,0)}</div><div class="stat-mini-lbl">Facing total</div></div>
+  </div>
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:8px;">Desglose por barrio</div>
+  <div style="display:grid;gap:6px;">`;
+
+  sorted.forEach(([barrio,data])=>{
+    const pct=Math.round(data.visitas/maxV*100);
+    const conv=Math.round(data.ventas/data.visitas*100);
+    html+=`
+    <div style="background:var(--bg3);border-radius:var(--radius);padding:10px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+        <span style="font-weight:500;font-size:13px;">${barrio}</span>
+        <div style="display:flex;gap:8px;font-size:11px;font-family:var(--mono);">
+          <span style="color:var(--text2);">${data.visitas} vis.</span>
+          <span style="color:var(--green);">${data.ventas} vent.</span>
+          <span style="color:var(--teal);">${data.facing} facing</span>
+          <span style="color:${conv>=60?'var(--green)':conv>=40?'var(--amber)':'var(--red)'};">${conv}% conv.</span>
+        </div>
+      </div>
+      <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:var(--accent3);border-radius:2px;transition:width 0.4s;"></div>
+      </div>
+    </div>`;
+  });
+
+  html+='</div>';
+  content.innerHTML=html;
+
+  // Actualizar mapa para destacar este vendedor
+  drawGeoMap(visDelDia, true);
+  document.getElementById('map-overlay').textContent=`${nombre} — ${diaNombre} — ${visDelDia.length} visitas`;
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function closeDrill(){
+  document.getElementById('drill-panel').style.display='none';
+  const mesFilt=window.__hmMesFilt||[];
+  drawGeoMap(mesFilt);
+  document.getElementById('map-overlay').textContent=`Montevideo — ${mesFilt.length} visitas`;
+}
+
+function drawGeoMap(data, highlight=false){
+  const canvas=document.getElementById('geo-canvas'); if(!canvas)return;
+  const container=canvas.parentElement;
+  canvas.width=container.offsetWidth; canvas.height=280;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#1a0a0a'; ctx.fillRect(0,0,canvas.width,280);
+  ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+  for(let x=0;x<canvas.width;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,280);ctx.stroke();}
+  for(let y=0;y<280;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+  // Montevideo bounds
+  const minLat=-34.94,maxLat=-34.83,minLng=-56.25,maxLng=-56.05;
+  data.slice(-300).forEach(v=>{
+    const px=((v.lng-minLng)/(maxLng-minLng))*canvas.width;
+    const py=(1-(v.lat-minLat)/(maxLat-minLat))*240+20;
+    const r=v.hayFacing?Math.min(10,3+v.totalFacing/8):3;
+    ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);
+    ctx.fillStyle=v.venta?'rgba(34,201,147,0.75)':'rgba(231,76,60,0.6)'; ctx.fill();
+    if(v.hayFacing&&v.totalFacing>4){ctx.strokeStyle=v.venta?'rgba(34,201,147,0.95)':'rgba(231,76,60,0.85)';ctx.lineWidth=1;ctx.stroke();}
+  });
+  ctx.fillStyle='rgba(34,201,147,0.95)';ctx.beginPath();ctx.arc(12,260,5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.8)';ctx.font='11px DM Sans';ctx.fillText('Venta',22,264);
+  ctx.fillStyle='rgba(231,76,60,0.95)';ctx.beginPath();ctx.arc(72,260,5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.8)';ctx.fillText('Sin venta',82,264);
+  if(highlight){ctx.fillStyle='rgba(255,255,255,0.5)';ctx.fillText('↑ Filtrado por desarrollador/día',160,264);}
+  else{ctx.fillStyle='rgba(255,255,255,0.5)';ctx.fillText('Tamaño = facing',160,264);}
+}
+
+// ── EQUIPO ──
+function renderEquipo(el){
+  const mes=getThisMonth();
+  const mesFilt=VISITAS.filter(v=>isSameMonth(v.fecha,mes));
+  const vendData=VENDEDORES.map(v=>{
+    const vv=mesFilt.filter(x=>x.vendedor===v);
+    const ventas=vv.filter(x=>x.venta).length;
+    const conv=vv.length?Math.round(ventas/vv.length*100):0;
+    const facing=vv.reduce((s,x)=>s+x.totalFacing,0);
+    const sinFacing=vv.filter(x=>!x.hayFacing).length;
+    const hoy=VISITAS.filter(x=>x.vendedor===v&&x.fecha===getToday()).length;
+    const promDia=(vv.length/new Date().getDate()).toFixed(1);
+    return{nombre:v,visitas:vv.length,ventas,conv,facing,sinFacing,hoy,promDia};
+  }).sort((a,b)=>b.conv-a.conv);
+  el.innerHTML=`
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-title">Performance del equipo — mes actual</div>
+    <div style="overflow-x:auto;">
+    <table class="v-table" style="min-width:600px;">
+      <thead><tr><th>Vendedor</th><th>Visitas</th><th>Hoy</th><th>Prom/día</th><th>Ventas</th><th>Conv.</th><th>Facing</th><th>Sin facing</th><th>Estado</th></tr></thead>
+      <tbody>${vendData.map(v=>{
+        const badge=v.conv>=65?'badge-green':v.conv>=50?'badge-amber':'badge-red';
+        const label=v.conv>=65?'Excelente':v.conv>=50?'Normal':'Bajo';
+        const barW=Math.round((v.visitas/Math.max(...vendData.map(x=>x.visitas)))*60);
+        return`<tr>
+          <td style="font-weight:500;">${v.nombre}</td>
+          <td>${v.visitas}<span class="bar-mini" style="width:${barW}px;"></span></td>
+          <td style="font-family:var(--mono);font-weight:600;">${v.hoy}</td>
+          <td style="font-family:var(--mono);">${v.promDia}</td>
+          <td>${v.ventas}</td>
+          <td style="font-family:var(--mono);">${v.conv}%</td>
+          <td style="font-family:var(--mono);">${v.facing}</td>
+          <td style="font-family:var(--mono);color:${v.sinFacing>5?'var(--red)':'var(--text2)'};">${v.sinFacing}</td>
+          <td><span class="badge ${badge}">${label}</span></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
+    </div>
+  </div>
+  <div class="charts-row">
+    <div class="card"><div class="card-title">Visitas por vendedor</div><div class="chart-wrap" style="height:180px;"><canvas id="ch-vend-vis"></canvas></div></div>
+    <div class="card"><div class="card-title">Conversión por vendedor</div><div class="chart-wrap" style="height:180px;"><canvas id="ch-vend-conv"></canvas></div></div>
+  </div>`;
+  window.__equipoData=vendData;
+  setTimeout(()=>{
+    if(document.getElementById('ch-vend-vis'))
+      new Chart(document.getElementById('ch-vend-vis'),{type:'bar',data:{labels:vendData.map(v=>v.nombre.split(',')[0]),datasets:[{data:vendData.map(v=>v.visitas),backgroundColor:'rgba(192,57,43,0.7)',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#666666',font:{size:10}}},y:{grid:{color:'rgba(0,0,0,0.06)'},ticks:{color:'#999999',font:{size:10}}}}}});
+    if(document.getElementById('ch-vend-conv'))
+      new Chart(document.getElementById('ch-vend-conv'),{type:'bar',data:{labels:vendData.map(v=>v.nombre.split(',')[0]),datasets:[{data:vendData.map(v=>v.conv),backgroundColor:vendData.map(v=>v.conv>=65?'rgba(34,201,147,0.7)':v.conv>=50?'rgba(245,158,42,0.7)':'rgba(231,76,60,0.7)'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#666666',font:{size:10}}},y:{grid:{color:'rgba(0,0,0,0.06)'},ticks:{color:'#999999',font:{size:10}},max:100}}}});
+  },50);
+}
+
+// ── REGISTROS ──
+function renderRegistros(el){
+  const vis=VISITAS.slice(-50).reverse();
+  el.innerHTML=`
+  <div class="filters">
+    <select id="reg-vend" onchange="filterRegistros()"><option value="">Todos los vendedores</option>${VENDEDORES.map(v=>`<option>${v}</option>`).join('')}</select>
+    <input type="text" id="reg-barrio" placeholder="Filtrar barrio…" oninput="filterRegistros()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;"/>
+  </div>
+  <div class="card">
+    <div class="card-title">Últimas 50 visitas</div>
+    <div style="overflow-x:auto;">
+    <table class="v-table" style="min-width:700px;">
+      <thead><tr><th>ID</th><th>Fecha</th><th>Vendedor</th><th>Barrio</th><th>Dirección</th><th>Venta</th><th>Producto vendido</th><th>Facing</th></tr></thead>
+      <tbody id="reg-body">${buildRegRows(vis)}</tbody>
+    </table>
+    </div>
+  </div>`;
+  window.__regData=vis;
+}
+function buildRegRows(data){
+  return data.map(v=>`<tr>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${v.id}</td>
+    <td style="font-family:var(--mono);font-size:12px;">${v.fecha}</td>
+    <td style="font-size:12px;">${v.vendedor}</td>
+    <td>${v.barrio}</td>
+    <td style="font-size:11px;color:var(--text2);">${v.calle} ${v.numero}</td>
+    <td><span class="badge ${v.venta?'badge-green':'badge-red'}">${v.venta?'Sí':'No'}</span></td>
+    <td style="font-size:11px;color:var(--text2);">${v.venta&&v.marcaVenta?`${v.marcaVenta} / ${v.prodVenta} (${v.presVenta})`:'—'}</td>
+    <td style="font-family:var(--mono);">${v.hayFacing?v.totalFacing:'—'}</td>
+  </tr>`).join('');
+}
+function filterRegistros(){
+  const vend=document.getElementById('reg-vend').value;
+  const barrio=document.getElementById('reg-barrio').value.toLowerCase();
+  let data=VISITAS.slice(-200).reverse();
+  if(vend)data=data.filter(v=>v.vendedor===vend);
+  if(barrio)data=data.filter(v=>v.barrio.toLowerCase().includes(barrio));
+  document.getElementById('reg-body').innerHTML=buildRegRows(data.slice(0,50));
+}
+
+// ── CATÁLOGO (supervisor + admin) ──
+function renderCatalogo(el){
+  el.innerHTML=`
+  <div style="display:grid;gap:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:16px;font-weight:600;color:var(--text);">Gestión de catálogo</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="new-marca-input" placeholder="Nombre nueva marca…" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:8px 12px;font-size:13px;"/>
+        <button class="btn btn-primary btn-sm" onclick="addMarca()">+ Agregar marca</button>
+      </div>
+    </div>
+    <div id="catalogo-list"></div>
+  </div>`;
+  renderCatalogoList();
+}
+
+function renderCatalogoList(){
+  const container=document.getElementById('catalogo-list');
+  if(!container)return;
+  container.innerHTML='';
+  getMarcas().forEach(marca=>{
+    const prods=getProductos(marca);
+    const div=document.createElement('div');
+    div.className='catalog-section';
+    div.innerHTML=`
+      <div class="catalog-marca-header">
+        <div class="catalog-marca-name" style="display:flex;align-items:center;gap:8px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;"></span>
+          ${marca}
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeMarca('${marca}')">Eliminar marca</button>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:6px;">Productos</div>
+        <div id="prods-${sanitizeId(marca)}" style="display:flex;flex-wrap:wrap;gap:2px;align-items:center;min-height:28px;">
+          ${prods.map(p=>`<span class="product-tag">${p}<button class="tag-remove" onclick="removeProd('${marca}','${p}')">✕</button></span>`).join('')}
+        </div>
+        <div class="add-inline" style="margin-top:8px;">
+          <input type="text" id="new-prod-${sanitizeId(marca)}" placeholder="Nuevo producto…"/>
+          <button class="btn btn-secondary btn-sm" onclick="addProd('${marca}')">+ Producto</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:6px;">Presentaciones por producto</div>
+        ${prods.map(p=>`
+          <div style="background:var(--bg5);border-radius:6px;padding:8px 10px;margin-bottom:6px;">
+            <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:5px;">${p}</div>
+            <div id="pres-tags-${sanitizeId(marca)}-${sanitizeId(p)}" style="display:flex;flex-wrap:wrap;gap:2px;align-items:center;min-height:24px;">
+              ${getPresentaciones(marca,p).map(pr=>`<span class="pres-tag">${pr}<button class="tag-remove" onclick="removePres('${marca}','${p}','${pr}')">✕</button></span>`).join('')}
+            </div>
+            <div class="add-inline" style="margin-top:6px;">
+              <input type="text" id="new-pres-${sanitizeId(marca)}-${sanitizeId(p)}" placeholder="Nueva presentación…"/>
+              <button class="btn btn-secondary btn-sm" onclick="addPres2('${marca}','${p}')">+ Presentación</button>
+            </div>
+          </div>`).join('')}
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+function sanitizeId(s){ return s.replace(/[^a-zA-Z0-9]/g,'_'); }
+
+// Mapas nombre→id para operar contra la base
+let MARCA_IDS={}, PROD_IDS={}, PRES_IDS={};
+async function loadCatalogoFromDB(){
+  const [{data:marcas},{data:prods},{data:pres}] = await Promise.all([
+    SB.from('marcas').select('*').order('nombre'),
+    SB.from('productos').select('*'),
+    SB.from('presentaciones').select('*')
+  ]);
+  CATALOGO={}; MARCA_IDS={}; PROD_IDS={}; PRES_IDS={};
+  const marcaById={};
+  (marcas||[]).forEach(m=>{ CATALOGO[m.nombre]={productos:{}}; MARCA_IDS[m.nombre]=m.id; marcaById[m.id]=m.nombre; });
+  const prodById={};
+  (prods||[]).forEach(p=>{ const mn=marcaById[p.marca_id]; if(mn==null)return; CATALOGO[mn].productos[p.nombre]=[]; PROD_IDS[mn+'|'+p.nombre]=p.id; prodById[p.id]={marca:mn,prod:p.nombre}; });
+  (pres||[]).forEach(pr=>{ const ref=prodById[pr.producto_id]; if(!ref)return; CATALOGO[ref.marca].productos[ref.prod].push(pr.nombre); PRES_IDS[ref.marca+'|'+ref.prod+'|'+pr.nombre]=pr.id; });
+}
+
+async function addMarca(){
+  const input=document.getElementById('new-marca-input');
+  const nombre=input.value.trim();
+  if(!nombre)return showToast('Ingresá un nombre de marca');
+  if(CATALOGO[nombre])return showToast('Esa marca ya existe');
+  const {error}=await SB.from('marcas').insert({nombre});
+  if(error)return showToast('Error guardando: '+error.message);
+  input.value='';
+  showToast(`✓ Marca "${nombre}" agregada`);
+  await loadCatalogoFromDB(); renderCatalogoList();
+}
+async function removeMarca(marca){
+  if(!confirm(`¿Eliminar la marca "${marca}" y todos sus productos?`))return;
+  const {error}=await SB.from('marcas').delete().eq('id',MARCA_IDS[marca]);
+  if(error)return showToast('Error: '+error.message);
+  showToast(`Marca "${marca}" eliminada`);
+  await loadCatalogoFromDB(); renderCatalogoList();
+}
+async function addProd(marca){
+  const input=document.getElementById(`new-prod-${sanitizeId(marca)}`);
+  const nombre=input.value.trim();
+  if(!nombre)return showToast('Ingresá un nombre de producto');
+  if(CATALOGO[marca].productos[nombre])return showToast('Ese producto ya existe');
+  const {error}=await SB.from('productos').insert({marca_id:MARCA_IDS[marca],nombre});
+  if(error)return showToast('Error: '+error.message);
+  input.value='';
+  showToast(`✓ Producto "${nombre}" agregado`);
+  await loadCatalogoFromDB(); renderCatalogoList();
+}
+async function removeProd(marca,prod){
+  const {error}=await SB.from('productos').delete().eq('id',PROD_IDS[marca+'|'+prod]);
+  if(error)return showToast('Error: '+error.message);
+  showToast(`Producto "${prod}" eliminado`);
+  await loadCatalogoFromDB(); renderCatalogoList();
+}
+async function addPres2(marca,prod){
+  const input=document.getElementById(`new-pres-${sanitizeId(marca)}-${sanitizeId(prod)}`);
+  const nombre=input.value.trim();
+  if(!nombre)return showToast('Ingresá un nombre de presentación');
+  if((CATALOGO[marca].productos[prod]||[]).includes(nombre))return showToast('Esa presentación ya existe');
+  const {error}=await SB.from('presentaciones').insert({producto_id:PROD_IDS[marca+'|'+prod],nombre});
+  if(error)return showToast('Error: '+error.message);
+  input.value='';
+  showToast(`✓ Presentación "${nombre}" agregada`);
+  await loadCatalogoFromDB(); renderCatalogoList();
+}
+async function removePres(marca,prod,pres){
+  const {error}=await SB.from('presentaciones').delete().eq('id',PRES_IDS[marca+'|'+prod+'|'+pres]);
+  if(error)return showToast('Error: '+error.message);
+  showToast(`Presentación "${pres}" eliminada`);
+  await loadCatalogoFromDB(); renderCatalogoList();
+}
+
+// ── USUARIOS ──
+let MGMT_USERS = [];
+const ROL_LABEL = {vendedor:'Vendedor', supervisor:'Supervisor', admin:'Admin'};
+let editUserId = null;
+
+async function renderUsuarios(el){
+  el.innerHTML=`<div class="card"><div class="card-title">Gestión de usuarios</div><div style="color:var(--text3);font-size:13px;padding:10px;">Cargando…</div></div>`;
+  const {data,error}=await SB.from('usuarios').select('*').order('created_at');
+  if(error){ el.innerHTML=`<div class="card"><div class="card-title">Gestión de usuarios</div><div style="color:var(--red);font-size:13px;padding:10px;">Error cargando: ${error.message}</div></div>`; return; }
+  MGMT_USERS=data||[];
+  el.innerHTML=`
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px;flex-wrap:wrap;">
+      <div class="card-title" style="margin:0;">Gestión de usuarios</div>
+      <button class="btn btn-primary btn-sm" onclick="openUserForm(null)">+ Nuevo usuario</button>
+    </div>
+    <div id="user-form-wrap" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;margin-bottom:14px;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:12px;" id="user-form-title">Nuevo usuario</div>
+      <div class="field-row" style="margin-bottom:10px;">
+        <div class="field"><label>Nombre</label><input type="text" id="u-nombre" placeholder="Ej: Juan Pérez"/></div>
+        <div class="field"><label>Email</label><input type="email" id="u-email" placeholder="usuario@fortylex.com"/></div>
+      </div>
+      <div class="field-row" style="margin-bottom:12px;">
+        <div class="field"><label>Contraseña</label><input type="text" id="u-pass" placeholder="Contraseña inicial"/></div>
+        <div class="field"><label>Perfil</label>
+          <select id="u-rol">
+            <option value="vendedor">Vendedor</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary btn-sm" onclick="saveUser()">Guardar</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeUserForm()">Cancelar</button>
+      </div>
+    </div>
+    <table class="v-table">
+      <thead><tr><th>Nombre</th><th>Email</th><th>Perfil</th><th>Estado</th><th style="text-align:right;">Acciones</th></tr></thead>
+      <tbody>${MGMT_USERS.map(u=>`<tr>
+        <td style="font-weight:500;">${u.nombre}</td>
+        <td style="font-size:12px;color:var(--text2);">${u.email}</td>
+        <td><span class="badge ${u.rol==='admin'?'badge-red':u.rol==='supervisor'?'badge-amber':'badge-green'}">${ROL_LABEL[u.rol]||u.rol}</span></td>
+        <td><span class="badge ${u.activo?'badge-green':'badge-red'}">${u.activo?'Activo':'Inactivo'}</span></td>
+        <td style="text-align:right;white-space:nowrap;">
+          <button class="btn btn-secondary btn-sm" onclick="openUserForm('${u.id}')">Editar</button>
+          <button class="btn btn-secondary btn-sm" onclick="toggleUserActive('${u.id}',${u.activo})">${u.activo?'Desactivar':'Activar'}</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Eliminar</button>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>
+    ${MGMT_USERS.length===0?'<div style="text-align:center;color:var(--text3);padding:20px;font-size:13px;">Todavía no hay usuarios cargados. Tocá "+ Nuevo usuario".</div>':''}
+  </div>`;
+}
+function openUserForm(id){
+  editUserId = id;
+  const wrap=document.getElementById('user-form-wrap');
+  document.getElementById('user-form-title').textContent = id ? 'Editar usuario' : 'Nuevo usuario';
+  const u = id ? MGMT_USERS.find(x=>x.id===id) : {nombre:'',email:'',password:'',rol:'vendedor'};
+  document.getElementById('u-nombre').value = u.nombre||'';
+  document.getElementById('u-email').value = u.email||'';
+  document.getElementById('u-pass').value = u.password||'';
+  document.getElementById('u-rol').value = u.rol||'vendedor';
+  wrap.style.display='block';
+}
+function closeUserForm(){ const w=document.getElementById('user-form-wrap'); if(w) w.style.display='none'; editUserId=null; }
+async function saveUser(){
+  const nombre=document.getElementById('u-nombre').value.trim();
+  const email=document.getElementById('u-email').value.trim();
+  const password=document.getElementById('u-pass').value.trim();
+  const rol=document.getElementById('u-rol').value;
+  if(!nombre||!email||!password) return showToast('Completá nombre, email y contraseña');
+  const vendedor = rol==='vendedor' ? nombre : null;   // así el vendedor ve "lo suyo" en la histórica
+  if(editUserId){
+    const {error}=await SB.from('usuarios').update({nombre,email,password,rol,vendedor}).eq('id',editUserId);
+    if(error)return showToast('Error: '+error.message);
+    showToast('✓ Usuario actualizado');
+  } else {
+    const {data:exist}=await SB.from('usuarios').select('id').ilike('email',email).maybeSingle();
+    if(exist) return showToast('Ya existe un usuario con ese email');
+    const {error}=await SB.from('usuarios').insert({nombre,email,password,rol,vendedor,activo:true});
+    if(error)return showToast('Error: '+error.message);
+    showToast(`✓ Usuario "${nombre}" creado como ${ROL_LABEL[rol]}`);
+  }
+  closeUserForm();
+  navigate('usuarios');
+}
+async function toggleUserActive(id,current){
+  const {error}=await SB.from('usuarios').update({activo:!current}).eq('id',id);
+  if(error)return showToast('Error: '+error.message);
+  navigate('usuarios');
+}
+async function deleteUser(id){
+  const u=MGMT_USERS.find(x=>x.id===id);
+  if(!confirm(`¿Eliminar a ${u?u.nombre:'este usuario'}?`))return;
+  const {error}=await SB.from('usuarios').delete().eq('id',id);
+  if(error)return showToast('Error: '+error.message);
+  showToast('Usuario eliminado');
+  navigate('usuarios');
+}
+
+// ── CONFIG ──
+function renderConfig(el){
+  el.innerHTML=`
+  <div style="display:grid;gap:12px;">
+    <div class="card">
+      <div class="card-title">Exportación de datos</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button class="btn btn-secondary" onclick="exportCSV()">⬇ Exportar visitas CSV</button>
+        <button class="btn btn-secondary" onclick="showToast('Exportando facing detallado…')">⬇ Exportar facing CSV</button>
+        <button class="btn btn-secondary" onclick="showToast('Conectando con Power BI…')">⬡ Conectar Power BI</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Para gestionar el catálogo</div>
+      <p style="color:var(--text2);font-size:13px;">Usá la sección <strong style="color:var(--accent3);">Catálogo</strong> en el menú de navegación para agregar y eliminar marcas, productos y presentaciones.</p>
+    </div>
+  </div>`;
+}
+
+// ── UTILS ──
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+function exportCSV(){
+  const headers=['id','fecha','vendedor','barrio','calle','numero','lat','lng','venta','marcaVenta','prodVenta','presVenta','hayFacing','totalFacing'];
+  const rows=VISITAS.map(v=>[v.id,v.fecha,v.vendedor,v.barrio,v.calle,v.numero,v.lat.toFixed(6),v.lng.toFixed(6),v.venta?1:0,v.marcaVenta||'',v.prodVenta||'',v.presVenta||'',v.hayFacing?1:0,v.totalFacing].join(','));
+  const csv=[headers.join(','),...rows].join('\n');
+  const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download='fortyapp_visitas.csv'; a.click();
+  showToast('✓ CSV descargado');
+}
+</script>
+</body>
+</html>
