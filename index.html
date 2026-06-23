@@ -123,6 +123,7 @@ input,select,textarea{font-family:var(--font);}
 .badge-green{background:rgba(34,201,147,0.15);color:var(--green);}
 .badge-amber{background:rgba(245,158,42,0.15);color:var(--amber);}
 .badge-red{background:rgba(231,76,60,0.15);color:var(--red);}
+.badge-new{background:rgba(124,58,237,0.15);color:var(--purple);}
 .bar-mini{height:4px;border-radius:2px;background:var(--accent);display:inline-block;vertical-align:middle;margin-left:6px;}
 
 .form-section{margin-bottom:20px;}
@@ -163,6 +164,32 @@ input,select,textarea{font-family:var(--font);}
 
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .filters select,.filters input{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;}
+
+/* ── Searchable dropdown ── */
+.ss-wrap{position:relative;display:inline-flex;}
+.ss-native{position:absolute!important;width:1px;height:1px;padding:0!important;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
+.ss-trigger{display:inline-flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;cursor:pointer;font-family:var(--font);white-space:nowrap;min-width:0;transition:border-color .15s,box-shadow .15s;}
+.ss-trigger:hover{border-color:var(--accent2);}
+.ss-wrap.open .ss-trigger{border-color:var(--accent);box-shadow:0 0 0 2px rgba(192,57,43,0.12);}
+.ss-trigger-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ss-trigger .ss-caret{flex-shrink:0;color:var(--text3);font-size:10px;transition:transform .15s;}
+.ss-wrap.open .ss-trigger .ss-caret{transform:rotate(180deg);}
+.ss-panel{position:absolute;top:calc(100% + 4px);left:0;z-index:1000;min-width:100%;width:max-content;max-width:min(280px,80vw);background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);box-shadow:0 8px 28px rgba(139,0,0,0.18);overflow:hidden;display:none;}
+.ss-wrap.open .ss-panel{display:block;}
+.ss-search-box{display:flex;align-items:center;gap:7px;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.ss-search-box svg{flex-shrink:0;width:14px;height:14px;fill:none;stroke:var(--text3);stroke-width:2;}
+.ss-search-box input{flex:1;border:none;background:transparent;outline:none;font-size:12px;color:var(--text);font-family:var(--font);padding:0;min-width:0;}
+.ss-search-box input::placeholder{color:var(--text3);}
+.ss-list{max-height:230px;overflow-y:auto;scrollbar-width:thin;padding:4px;}
+.ss-opt{padding:7px 9px;border-radius:6px;font-size:12px;color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ss-opt:hover,.ss-opt.active{background:var(--bg4);}
+.ss-opt.selected{color:var(--accent);font-weight:600;}
+.ss-opt.selected::after{content:'✓';float:right;margin-left:10px;}
+.ss-empty{padding:12px 10px;font-size:12px;color:var(--text3);text-align:center;}
+.ss-opt .ss-new{display:inline-block;margin-left:8px;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600;letter-spacing:0.02em;background:rgba(124,58,237,0.15);color:var(--purple);vertical-align:middle;}
+
+/* ── Cliente nuevo (hint en formulario) ── */
+.client-new-hint{margin-top:6px;font-size:11px;font-weight:600;color:var(--purple);background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.28);border-radius:6px;padding:5px 9px;display:flex;align-items:center;gap:6px;}
 
 .map-mock{position:relative;border-radius:var(--radius);overflow:hidden;height:280px;background:#1a0a0a;}
 .map-mock canvas{position:absolute;inset:0;}
@@ -299,6 +326,40 @@ function getPresentaciones(marca,prod){ return ((CATALOGO[marca]||{}).productos|
 const VENDEDORES = ['García, M.','López, R.','Torres, A.','Ramírez, C.','Medina, P.'];
 const CLIENTES = ['Supermercado El Sol','Almacén Don Pedro','Minimarket 24hs','Farmacia Central','Kiosco La Esquina','Supermercado Disco','Almacén Norte','Maxiconsumo','Tienda Rápida','Bazar El Centro'];
 const BARRIOS_SUGERIDOS = ['Pocitos','Punta Carretas','Centro','Cordón','Palermo','Carrasco','Malvín','Buceo','Prado','Aguada','Ciudad Vieja','Tres Cruces','Flor de Maroñas','Unión','Maroñas'];
+
+// ── CLIENTES NUEVOS ──
+// Un cliente se considera "nuevo" si su PRIMERA visita ocurrió dentro de los últimos NEW_CLIENT_DAYS días.
+// No requiere tabla aparte: los clientes se guardan en la columna `cliente` de cada visita.
+const NEW_CLIENT_DAYS = 30;
+// Mapa cliente -> fecha (YYYY-MM-DD) de su primera visita registrada.
+function getClientesFirstSeen(){
+  const map={};
+  (typeof VISITAS!=='undefined'?VISITAS:[]).forEach(v=>{
+    const c=(v.cliente||'').trim();
+    if(!c) return;
+    if(!map[c] || v.fecha < map[c]) map[c]=v.fecha;
+  });
+  return map;
+}
+// Lista de todos los clientes conocidos (de las visitas), ordenada. Si no hay, usa la semilla CLIENTES.
+function getClientesAll(){
+  const s=new Set((typeof VISITAS!=='undefined'?VISITAS:[]).map(v=>(v.cliente||'').trim()).filter(Boolean));
+  const arr=[...s];
+  return (arr.length?arr:CLIENTES.slice()).sort((a,b)=>a.localeCompare(b,'es'));
+}
+// ¿Es nuevo este cliente? (opcionalmente se le pasa el mapa firstSeen ya calculado)
+function isClienteNuevo(cliente, firstSeen){
+  const c=(cliente||'').trim(); if(!c) return false;
+  const fs=firstSeen||getClientesFirstSeen();
+  const d=fs[c]; if(!d) return false;
+  const diff=(Date.now()-new Date(d+'T00:00:00').getTime())/86400000;
+  return diff<=NEW_CLIENT_DAYS;
+}
+// Genera el HTML de <option> para un cliente, marcando data-new si corresponde.
+function clienteOptionHTML(c, selectedVal, firstSeen){
+  const nuevo=isClienteNuevo(c, firstSeen);
+  return `<option value="${c}"${selectedVal===c?' selected':''}${nuevo?' data-new="1"':''}>${c}</option>`;
+}
 
 function genVisitas(){
   const v=[]; const today=new Date();
@@ -575,6 +636,12 @@ function renderNuevaVisita(el){
     <div class="form-section">
       <div class="form-section-title">Punto de venta</div>
       <div class="field">
+        <label>Cliente / Comercio</label>
+        <input type="text" id="f-cliente" placeholder="Elegí uno existente o escribí uno nuevo…" list="clientes-datalist" autocomplete="off" oninput="checkClienteNuevo()"/>
+        <datalist id="clientes-datalist">${getClientesAll().map(c=>`<option value="${c}">`).join('')}</datalist>
+        <div id="cliente-nuevo-hint" class="client-new-hint" style="display:none;"><span>✨</span><span>Cliente nuevo — se guardará al registrar la visita</span></div>
+      </div>
+      <div class="field">
         <label>Barrio</label>
         <input type="text" id="f-barrio" placeholder="Ej: Pocitos, Centro, Palermo…" list="barrios-datalist"/>
         <datalist id="barrios-datalist">${BARRIOS_SUGERIDOS.map(b=>`<option value="${b}">`).join('')}</datalist>
@@ -652,6 +719,15 @@ function renderNuevaVisita(el){
   </div>`;
 }
 
+// Muestra el aviso de "cliente nuevo" en vivo mientras se escribe el nombre.
+function checkClienteNuevo(){
+  const inp=document.getElementById('f-cliente');
+  const hint=document.getElementById('cliente-nuevo-hint');
+  if(!inp||!hint) return;
+  const val=inp.value.trim().toLowerCase();
+  const existe=getClientesAll().some(c=>c.toLowerCase()===val);
+  hint.style.display = (val && !existe) ? 'flex' : 'none';
+}
 function updateVentaLabel(){
   const cb=document.getElementById('f-venta');
   const lbl=document.getElementById('venta-label');
@@ -774,11 +850,14 @@ async function guardarVisita(){
   const venta=document.getElementById('f-venta').checked;
   const hayFacing=document.getElementById('f-facing').checked;
   const now=new Date();
+  const clienteVal=(document.getElementById('f-cliente')?.value||'').trim()||null;
+  // ¿Es un cliente que todavía no existía? (se evalúa ANTES de guardar)
+  const esClienteNuevo = !!clienteVal && !getClientesAll().some(c=>c.toLowerCase()===clienteVal.toLowerCase());
   const visita={
     fecha: now.toISOString().slice(0,10),
     hora: now.toTimeString().slice(0,5),
     vendedor: currentUser.nombre,
-    cliente: null,
+    cliente: clienteVal,
     tipo: document.getElementById('f-tipo').value.trim()||null,
     barrio: document.getElementById('f-barrio').value.trim()||null,
     calle: document.getElementById('f-calle').value.trim()||null,
@@ -823,7 +902,7 @@ async function guardarVisita(){
         if(de) throw de;
       }
     }
-    showToast('✓ Visita guardada');
+    showToast(esClienteNuevo ? `✓ Visita guardada — nuevo cliente "${clienteVal}" agregado` : '✓ Visita guardada');
     await loadVisitasFromDB();
     navigate('mis-visitas');
   }catch(e){
@@ -846,7 +925,8 @@ function renderMisVisitas(el){
   if(misVisitasFiltros.cliente) filtradas=filtradas.filter(v=>v.cliente===misVisitasFiltros.cliente);
   filtradas=filtradas.slice().reverse();
 
-  const clientesMes=[...new Set(mis.filter(v=>!misVisitasFiltros.mes||v.fecha.startsWith(misVisitasFiltros.mes)).map(v=>v.cliente))].sort();
+  const clientesMes=[...new Set(mis.filter(v=>!misVisitasFiltros.mes||v.fecha.startsWith(misVisitasFiltros.mes)).map(v=>v.cliente))].filter(Boolean).sort();
+  const fsMV=getClientesFirstSeen();
 
   el.innerHTML=`
   <div class="card">
@@ -857,9 +937,9 @@ function renderMisVisitas(el){
           <option value="">Todos los meses</option>
           ${meses.map(m=>`<option value="${m}"${misVisitasFiltros.mes===m?' selected':''}>${m}</option>`).join('')}
         </select>
-        <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;" onchange="misVisitasFiltros.cliente=this.value;renderMisVisitas(document.getElementById('main-content'))">
+        <select class="js-searchable" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;" onchange="misVisitasFiltros.cliente=this.value;renderMisVisitas(document.getElementById('main-content'))">
           <option value="">Todos los clientes</option>
-          ${clientesMes.map(c=>`<option value="${c}"${misVisitasFiltros.cliente===c?' selected':''}>${c}</option>`).join('')}
+          ${clientesMes.map(c=>clienteOptionHTML(c, misVisitasFiltros.cliente, fsMV)).join('')}
         </select>
         <span style="font-size:12px;color:var(--text3);">${filtradas.length} visitas</span>
       </div>
@@ -869,7 +949,7 @@ function renderMisVisitas(el){
       <thead><tr><th>Fecha</th><th>Cliente</th><th>Barrio</th><th>Venta</th><th>Producto vendido</th><th>Facing</th></tr></thead>
       <tbody>${filtradas.length?filtradas.map(v=>`<tr>
         <td style="font-family:var(--mono);font-size:12px;color:var(--text2);">${v.fecha}</td>
-        <td style="font-size:12px;font-weight:500;">${v.cliente||'—'}</td>
+        <td style="font-size:12px;font-weight:500;">${v.cliente?`${v.cliente}${isClienteNuevo(v.cliente,fsMV)?' <span class="badge badge-new">Nuevo</span>':''}`:'—'}</td>
         <td>${v.barrio}<br><span style="font-size:10px;color:var(--text3);">${v.calle} ${v.numero}</span></td>
         <td><span class="badge ${v.venta?'badge-green':'badge-red'}">${v.venta?'Sí':'No'}</span></td>
         <td style="font-size:11px;color:var(--text2);">${v.venta&&v.marcaVenta?`${v.marcaVenta} / ${v.prodVenta}<br><span style="color:var(--text3);">${v.presVenta}</span>`:'—'}</td>
@@ -921,9 +1001,9 @@ function renderMiDashboard(el){
     <div class="card" style="padding:12px 16px;">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:8px;">Filtrar mi rendimiento</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;flex:1;min-width:130px;" onchange="miDashFiltros.cliente=this.value;renderMiDashboard(document.getElementById('main-content'))">
+        <select class="js-searchable" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;flex:1;min-width:130px;" onchange="miDashFiltros.cliente=this.value;renderMiDashboard(document.getElementById('main-content'))">
           <option value="">Todos los clientes</option>
-          ${clientesDisp.map(c=>`<option value="${c}"${miDashFiltros.cliente===c?' selected':''}>${c}</option>`).join('')}
+          ${clientesDisp.map(c=>clienteOptionHTML(c, miDashFiltros.cliente)).join('')}
         </select>
         <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;flex:1;min-width:120px;" onchange="miDashFiltros.marca=this.value;miDashFiltros.producto='';renderMiDashboard(document.getElementById('main-content'))">
           <option value="">Todas las marcas</option>
@@ -992,13 +1072,13 @@ function renderDashboard(el){
 
   el.innerHTML=`
   <div class="filters">
-    <select onchange="dashFilters.vendedor=this.value;navigate('dashboard')">
+    <select class="js-searchable" onchange="dashFilters.vendedor=this.value;navigate('dashboard')">
       <option value="">Todos los vendedores</option>
       ${VENDEDORES.map(v=>`<option${dashFilters.vendedor===v?' selected':''}>${v}</option>`).join('')}
     </select>
-    <select onchange="dashFilters.cliente=this.value;navigate('dashboard')">
+    <select class="js-searchable" onchange="dashFilters.cliente=this.value;navigate('dashboard')">
       <option value="">Todos los clientes</option>
-      ${CLIENTES.map(c=>`<option${dashFilters.cliente===c?' selected':''}>${c}</option>`).join('')}
+      ${getClientesAll().map(c=>clienteOptionHTML(c, dashFilters.cliente)).join('')}
     </select>
     <input type="text" placeholder="Filtrar barrio…" value="${dashFilters.barrio}" oninput="dashFilters.barrio=this.value;navigate('dashboard')" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;"/>
     <select onchange="dashFilters.marca=this.value;navigate('dashboard')">
@@ -1356,7 +1436,7 @@ function renderRegistros(el){
   const vis=VISITAS.slice(-50).reverse();
   el.innerHTML=`
   <div class="filters">
-    <select id="reg-vend" onchange="filterRegistros()"><option value="">Todos los vendedores</option>${VENDEDORES.map(v=>`<option>${v}</option>`).join('')}</select>
+    <select id="reg-vend" class="js-searchable" onchange="filterRegistros()"><option value="">Todos los vendedores</option>${VENDEDORES.map(v=>`<option>${v}</option>`).join('')}</select>
     <input type="text" id="reg-barrio" placeholder="Filtrar barrio…" oninput="filterRegistros()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:12px;"/>
   </div>
   <div class="card">
@@ -1655,6 +1735,144 @@ function exportCSV(){
   const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download='fortyapp_visitas.csv'; a.click();
   showToast('✓ CSV descargado');
 }
+
+// ── SEARCHABLE DROPDOWN ──
+// Convierte cualquier <select class="js-searchable"> en un desplegable con buscador (lupa).
+// No toca la lógica de filtros: setea el value del <select> nativo y dispara su evento "change".
+(function(){
+  const norm = s => (s||'').toString().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,''); // ignora tildes/acentos
+
+  function buildOptions(sel){
+    return Array.from(sel.options).map(o => ({value:o.value, label:o.textContent, isNew:o.dataset.new==='1'}));
+  }
+
+  function enhance(sel){
+    if(sel.dataset.ss) return;            // ya mejorado
+    sel.dataset.ss = '1';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ss-wrap';
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    sel.classList.add('ss-native');
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'ss-trigger';
+    trigger.innerHTML = '<span class="ss-trigger-label"></span><span class="ss-caret">▼</span>';
+    const label = trigger.querySelector('.ss-trigger-label');
+
+    const panel = document.createElement('div');
+    panel.className = 'ss-panel';
+    panel.innerHTML =
+      '<div class="ss-search-box">' +
+        '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>' +
+        '<input type="text" placeholder="Buscar…" autocomplete="off" spellcheck="false"/>' +
+      '</div>' +
+      '<div class="ss-list"></div>';
+    const search = panel.querySelector('input');
+    const list = panel.querySelector('.ss-list');
+
+    wrap.appendChild(trigger);
+    wrap.appendChild(panel);
+
+    let activeIdx = -1;
+
+    function syncLabel(){
+      const o = sel.options[sel.selectedIndex];
+      label.textContent = o ? o.textContent : '';
+    }
+
+    function renderList(filter){
+      const opts = buildOptions(sel);
+      const f = norm(filter);
+      const shown = opts.filter(o => norm(o.label).includes(f));
+      list.innerHTML = '';
+      activeIdx = -1;
+      if(!shown.length){
+        list.innerHTML = '<div class="ss-empty">Sin resultados</div>';
+        return;
+      }
+      shown.forEach(o => {
+        const row = document.createElement('div');
+        row.className = 'ss-opt' + (o.value === sel.value ? ' selected' : '');
+        row.textContent = o.label;
+        if(o.isNew){
+          const pill=document.createElement('span');
+          pill.className='ss-new';
+          pill.textContent='Nuevo';
+          row.appendChild(pill);
+        }
+        row.dataset.value = o.value;
+        row.addEventListener('mousedown', e => { e.preventDefault(); choose(o.value); });
+        list.appendChild(row);
+      });
+    }
+
+    function choose(value){
+      if(sel.value !== value){
+        sel.value = value;
+        sel.dispatchEvent(new Event('change', {bubbles:true})); // dispara el onchange original
+      } else {
+        close();
+      }
+    }
+
+    function open(){
+      if(wrap.classList.contains('open')) return;
+      // cerrar otros abiertos
+      document.querySelectorAll('.ss-wrap.open').forEach(w => w.dispatchEvent(new Event('ss-close')));
+      wrap.classList.add('open');
+      search.value = '';
+      renderList('');
+      setTimeout(()=>search.focus(), 0);
+    }
+    function close(){ wrap.classList.remove('open'); }
+    wrap.addEventListener('ss-close', close);
+
+    trigger.addEventListener('click', () => wrap.classList.contains('open') ? close() : open());
+
+    search.addEventListener('input', () => renderList(search.value));
+
+    search.addEventListener('keydown', e => {
+      const rows = Array.from(list.querySelectorAll('.ss-opt'));
+      if(e.key === 'ArrowDown'){ e.preventDefault(); activeIdx = Math.min(activeIdx+1, rows.length-1); }
+      else if(e.key === 'ArrowUp'){ e.preventDefault(); activeIdx = Math.max(activeIdx-1, 0); }
+      else if(e.key === 'Enter'){ e.preventDefault(); const r = rows[activeIdx] || rows[0]; if(r) choose(r.dataset.value); return; }
+      else if(e.key === 'Escape'){ close(); trigger.focus(); return; }
+      else return;
+      rows.forEach((r,i)=>r.classList.toggle('active', i===activeIdx));
+      if(rows[activeIdx]) rows[activeIdx].scrollIntoView({block:'nearest'});
+    });
+
+    syncLabel();
+  }
+
+  function enhanceAll(){
+    document.querySelectorAll('select.js-searchable:not([data-ss])').forEach(enhance);
+  }
+
+  // Cerrar al hacer click fuera
+  document.addEventListener('click', e => {
+    document.querySelectorAll('.ss-wrap.open').forEach(w => {
+      if(!w.contains(e.target)) w.classList.remove('open');
+    });
+  });
+
+  // Re-aplicar cuando se vuelve a renderizar el contenido
+  const target = document.getElementById('main-content') || document.body;
+  let scheduled = false;
+  const mo = new MutationObserver(() => {
+    if(scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => { scheduled = false; enhanceAll(); });
+  });
+  mo.observe(target, {childList:true, subtree:true});
+
+  enhanceAll();
+  window.enhanceSearchableSelects = enhanceAll;
+})();
 </script>
 </body>
 </html>
