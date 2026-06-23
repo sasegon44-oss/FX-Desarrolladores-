@@ -191,6 +191,19 @@ input,select,textarea{font-family:var(--font);}
 /* ── Cliente nuevo (hint en formulario) ── */
 .client-new-hint{margin-top:6px;font-size:11px;font-weight:600;color:var(--purple);background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.28);border-radius:6px;padding:5px 9px;display:flex;align-items:center;gap:6px;}
 
+/* ── Geolocalización ── */
+.geo-btn{width:100%;justify-content:center;background:rgba(14,161,90,0.12);color:var(--green);border:1px solid rgba(14,161,90,0.35);font-weight:600;}
+.geo-btn:hover{background:rgba(14,161,90,0.2);}
+.geo-btn:disabled{opacity:0.6;cursor:default;}
+.geo-status{margin-top:8px;font-size:11px;border-radius:6px;padding:7px 10px;display:none;line-height:1.5;}
+.geo-status.show{display:block;}
+.geo-status.ok{background:rgba(14,161,90,0.1);border:1px solid rgba(14,161,90,0.3);color:var(--green);}
+.geo-status.loading{background:var(--bg3);border:1px solid var(--border2);color:var(--text2);}
+.geo-status.err{background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);color:var(--red);}
+.geo-coords{color:var(--text3);font-size:10px;margin-top:2px;font-family:monospace;}
+.geo-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:geo-rot 0.7s linear infinite;vertical-align:-2px;margin-right:5px;}
+@keyframes geo-rot{to{transform:rotate(360deg);}}
+
 .map-mock{position:relative;border-radius:var(--radius);overflow:hidden;height:280px;background:#1a0a0a;}
 .map-mock canvas{position:absolute;inset:0;}
 .map-overlay{position:absolute;top:8px;left:8px;background:rgba(26,10,10,0.85);border-radius:6px;padding:6px 10px;font-size:11px;color:rgba(255,255,255,0.85);}
@@ -619,6 +632,7 @@ function renderHistorica(el){
 
 // ── NUEVA VISITA ──
 function renderNuevaVisita(el){
+  ultimaUbicacion=null;
   const now=new Date();
   const dateStr=now.toISOString().slice(0,10);
   const timeStr=now.toTimeString().slice(0,5);
@@ -635,6 +649,8 @@ function renderNuevaVisita(el){
     </div>
     <div class="form-section">
       <div class="form-section-title">Punto de venta</div>
+      <button type="button" class="btn btn-sm geo-btn" id="geo-btn" onclick="capturarUbicacion()">📍 Detectar mi ubicación</button>
+      <div class="geo-status" id="geo-status"></div>
       <div class="field">
         <label>Cliente / Comercio</label>
         <input type="text" id="f-cliente" placeholder="Elegí uno existente o escribí uno nuevo…" list="clientes-datalist" autocomplete="off" oninput="checkClienteNuevo()"/>
@@ -727,6 +743,72 @@ function checkClienteNuevo(){
   const val=inp.value.trim().toLowerCase();
   const existe=getClientesAll().some(c=>c.toLowerCase()===val);
   hint.style.display = (val && !existe) ? 'flex' : 'none';
+}
+
+// ── GEOLOCALIZACIÓN ──
+// Guarda las coordenadas de la última captura (por si luego se quieren persistir).
+let ultimaUbicacion=null;
+// Poné true SOLO si agregaste columnas `lat` y `lng` (tipo float8) a la tabla `visitas` en Supabase.
+const SAVE_COORDS=false;
+
+function setGeoStatus(tipo, html){
+  const box=document.getElementById('geo-status');
+  if(!box) return;
+  box.className='geo-status show '+tipo;
+  box.innerHTML=html;
+}
+
+function capturarUbicacion(){
+  const btn=document.getElementById('geo-btn');
+  if(!('geolocation' in navigator)){
+    return setGeoStatus('err','Tu dispositivo o navegador no permite geolocalización.');
+  }
+  // La geolocalización solo funciona en contextos seguros (HTTPS o localhost).
+  if(window.isSecureContext===false){
+    return setGeoStatus('err','⚠️ La ubicación necesita que la app se abra por <b>https://</b> (no funciona abriendo el archivo directo ni por http).');
+  }
+  if(btn) btn.disabled=true;
+  setGeoStatus('loading','<span class="geo-spin"></span>Obteniendo tu ubicación…');
+
+  navigator.geolocation.getCurrentPosition(
+    async pos=>{
+      const {latitude:lat, longitude:lng, accuracy}=pos.coords;
+      ultimaUbicacion={lat, lng, accuracy};
+      setGeoStatus('loading','<span class="geo-spin"></span>Ubicación encontrada, buscando la dirección…'+
+        `<div class="geo-coords">${lat.toFixed(5)}, ${lng.toFixed(5)} · ±${Math.round(accuracy)} m</div>`);
+      let detalle='';
+      try{
+        const url=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=es`;
+        const r=await fetch(url,{headers:{'Accept':'application/json'}});
+        if(r.ok){
+          const j=await r.json();
+          const a=j.address||{};
+          const barrio=a.suburb||a.neighbourhood||a.quarter||a.city_district||a.borough||'';
+          const calle=a.road||a.pedestrian||a.footway||'';
+          const numero=a.house_number||'';
+          const setIf=(id,val)=>{const el=document.getElementById(id); if(el && val && !el.value.trim()){ el.value=val; }};
+          setIf('f-barrio',barrio);
+          setIf('f-calle',calle);
+          setIf('f-num',numero);
+          const partes=[calle&&numero?`${calle} ${numero}`:calle, barrio].filter(Boolean);
+          detalle = partes.length? ' · '+partes.join(', ') : '';
+        }
+      }catch(e){ /* sin internet o servicio no disponible: igual quedan las coordenadas */ }
+      setGeoStatus('ok', `✓ Ubicación capturada${detalle}`+
+        `<div class="geo-coords">${lat.toFixed(5)}, ${lng.toFixed(5)} · precisión ±${Math.round(accuracy)} m</div>`+
+        (detalle?'':'<div class="geo-coords">No se pudo autocompletar la dirección, pero las coordenadas quedaron guardadas.</div>'));
+      if(btn) btn.disabled=false;
+    },
+    err=>{
+      let msg='No se pudo obtener la ubicación.';
+      if(err.code===1) msg='Permiso de ubicación denegado. Activalo en el navegador para usar esta función.';
+      else if(err.code===2) msg='Ubicación no disponible. Probá activar el GPS / datos.';
+      else if(err.code===3) msg='Tardó demasiado. Probá de nuevo.';
+      setGeoStatus('err','⚠️ '+msg);
+      if(btn) btn.disabled=false;
+    },
+    {enableHighAccuracy:true, timeout:12000, maximumAge:0}
+  );
 }
 function updateVentaLabel(){
   const cb=document.getElementById('f-venta');
@@ -869,6 +951,11 @@ async function guardarVisita(){
     hay_facing: hayFacing,
     total_facing: 0
   };
+  // Adjunta coordenadas solo si activaste SAVE_COORDS y existen las columnas lat/lng en la tabla.
+  if(SAVE_COORDS && ultimaUbicacion){
+    visita.lat=ultimaUbicacion.lat;
+    visita.lng=ultimaUbicacion.lng;
+  }
   if(!visita.barrio){ return showToast('Completá al menos el barrio'); }
   // recolectar facing del formulario
   const facing=[];
