@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root {
   --bg: #faf7f7;
@@ -204,6 +206,13 @@ input,select,textarea{font-family:var(--font);}
 .geo-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:geo-rot 0.7s linear infinite;vertical-align:-2px;margin-right:5px;}
 @keyframes geo-rot{to{transform:rotate(360deg);}}
 
+/* ── Mapa de visitas (Leaflet) ── */
+#mapa-canvas{height:560px;width:100%;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border2);background:var(--bg3);}
+#mapa-canvas .leaflet-popup-content{font-family:var(--font);font-size:12px;line-height:1.5;}
+.map-empty{display:flex;align-items:center;justify-content:center;height:100%;text-align:center;color:var(--text3);font-size:13px;padding:30px;}
+.map-legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--text2);margin-top:10px;}
+.map-legend .dot{display:inline-block;width:11px;height:11px;border-radius:50%;border:1.5px solid #fff;vertical-align:-1px;margin-right:5px;box-shadow:0 0 0 1px var(--border2);}
+
 .map-mock{position:relative;border-radius:var(--radius);overflow:hidden;height:280px;background:#1a0a0a;}
 .map-mock canvas{position:absolute;inset:0;}
 .map-overlay{position:absolute;top:8px;left:8px;background:rgba(26,10,10,0.85);border-radius:6px;padding:6px 10px;font-size:11px;color:rgba(255,255,255,0.85);}
@@ -315,13 +324,13 @@ const FX_LOGO="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARgAAADZCAYAAAD7TS8
 
 let currentRole = 'vendedor';
 const ROLES = {
-  vendedor:   { label:'Vendedor',   nav:['nueva-visita','mis-visitas','mi-dashboard','historica'] },
-  supervisor: { label:'Supervisor', nav:['dashboard','mapa-calor','equipo','registros','catalogo','historica'] },
-  admin:      { label:'Admin',      nav:['dashboard','mapa-calor','equipo','registros','catalogo','usuarios','config','historica'] }
+  vendedor:   { label:'Vendedor',   nav:['nueva-visita','mis-visitas','mapa','mi-dashboard','historica'] },
+  supervisor: { label:'Supervisor', nav:['dashboard','mapa','mapa-calor','equipo','registros','catalogo','historica'] },
+  admin:      { label:'Admin',      nav:['dashboard','mapa','mapa-calor','equipo','registros','catalogo','usuarios','config','historica'] }
 };
 const NAV_LABELS = {
   'nueva-visita':'Nueva visita','mis-visitas':'Mis visitas','mi-dashboard':'Mi rendimiento',
-  'dashboard':'Dashboard','mapa-calor':'Mapa de calor','equipo':'Equipo',
+  'dashboard':'Dashboard','mapa':'Mapa de visitas','mapa-calor':'Mapa de calor','equipo':'Equipo',
   'registros':'Registros','catalogo':'Catálogo','usuarios':'Usuarios','config':'Configuración','historica':'Histórica'
 };
 
@@ -519,7 +528,7 @@ function doLogout(){
 
 // ── NAV ──
 let currentPage='';
-const NAV_ICONS={'nueva-visita':'📝','mis-visitas':'📋','mi-dashboard':'📈','dashboard':'📊','mapa-calor':'🗺️','equipo':'👥','registros':'🗂️','catalogo':'📦','usuarios':'👤','config':'⚙️','historica':'🗓️'};
+const NAV_ICONS={'nueva-visita':'📝','mis-visitas':'📋','mi-dashboard':'📈','dashboard':'📊','mapa':'🌎','mapa-calor':'🗺️','equipo':'👥','registros':'🗂️','catalogo':'📦','usuarios':'👤','config':'⚙️','historica':'🗓️'};
 function toggleSidebar(){ document.querySelector('.sidebar').classList.toggle('collapsed'); }
 function buildNav(){
   const nav=document.getElementById('main-nav'); nav.innerHTML='';
@@ -537,7 +546,7 @@ function navigate(pageId){
   const content=document.getElementById('main-content'); content.innerHTML='';
   const renders={
     'nueva-visita':renderNuevaVisita,'mis-visitas':renderMisVisitas,'mi-dashboard':renderMiDashboard,
-    'dashboard':renderDashboard,'mapa-calor':renderMapaCalor,'equipo':renderEquipo,
+    'dashboard':renderDashboard,'mapa':renderMapaVisitas,'mapa-calor':renderMapaCalor,'equipo':renderEquipo,
     'registros':renderRegistros,'catalogo':renderCatalogo,'usuarios':renderUsuarios,'config':renderConfig,'historica':renderHistorica
   };
   if(renders[pageId]) renders[pageId](content);
@@ -749,7 +758,7 @@ function checkClienteNuevo(){
 // Guarda las coordenadas de la última captura (por si luego se quieren persistir).
 let ultimaUbicacion=null;
 // Poné true SOLO si agregaste columnas `lat` y `lng` (tipo float8) a la tabla `visitas` en Supabase.
-const SAVE_COORDS=false;
+const SAVE_COORDS=true;
 
 function setGeoStatus(tipo, html){
   const box=document.getElementById('geo-status');
@@ -978,7 +987,13 @@ async function guardarVisita(){
   }
   visita.total_facing=facing.reduce((s,f)=>s+f.total,0);
   try{
-    const {data,error}=await SB.from('visitas').insert(visita).select().single();
+    let ins=await SB.from('visitas').insert(visita).select().single();
+    // Si las columnas lat/lng todavía no existen en la tabla, reintenta sin coordenadas (no rompe el guardado).
+    if(ins.error && ('lat' in visita || 'lng' in visita) && /lat|lng|column/i.test(ins.error.message||'')){
+      const {lat, lng, ...sinGeo}=visita;
+      ins=await SB.from('visitas').insert(sinGeo).select().single();
+    }
+    const {data,error}=ins;
     if(error) throw error;
     for(const f of facing){
       const {data:fd,error:fe}=await SB.from('visita_facing').insert({visita_id:data.id,marca:f.marca,producto:f.producto,total:f.total}).select().single();
@@ -1276,6 +1291,92 @@ function buildHmData(mesFilt){
   const conv={};
   VENDEDORES.forEach(v=>{conv[v]=días.map((_,i)=>matrix[v][i]>0?Math.round(sales[v][i]/matrix[v][i]*100):0);});
   return {matrix,sales,facing,conv,días};
+}
+
+// ── MAPA DE VISITAS (geolocalización real con Leaflet) ──
+let mapaFiltros={vendedor:''};
+let __mapaLeaflet=null;
+
+function renderMapaVisitas(el){
+  const esVend = currentRole==='vendedor';
+  const vendNombre = currentUser.vendedor||currentUser.nombre;
+  let base = esVend ? VISITAS.filter(v=>v.vendedor===vendNombre) : VISITAS;
+  if(!esVend && mapaFiltros.vendedor) base = base.filter(v=>v.vendedor===mapaFiltros.vendedor);
+
+  const conGeo = base.filter(v=> typeof v.lat==='number' && typeof v.lng==='number' && !isNaN(v.lat) && !isNaN(v.lng));
+  const sinGeo = base.length - conGeo.length;
+  const ventas = conGeo.filter(v=>v.venta).length;
+
+  const filtroVend = esVend ? '' : `
+    <select class="js-searchable" onchange="mapaFiltros.vendedor=this.value;navigate('mapa')">
+      <option value="">Todos los vendedores</option>
+      ${VENDEDORES.map(v=>`<option${mapaFiltros.vendedor===v?' selected':''}>${v}</option>`).join('')}
+    </select>`;
+
+  el.innerHTML=`
+  <div style="display:grid;gap:12px;">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div class="card-title" style="margin:0;">Mapa de visitas geolocalizadas</div>
+        <div class="filters" style="margin:0;">${filtroVend}</div>
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;">
+        <div><span style="color:var(--text3);">En el mapa</span> · <b>${conGeo.length}</b> visita${conGeo.length===1?'':'s'}</div>
+        <div><span style="color:var(--text3);">Con venta</span> · <b style="color:var(--green);">${ventas}</b></div>
+        ${sinGeo>0?`<div style="color:var(--text3);">Sin ubicación · ${sinGeo}</div>`:''}
+      </div>
+      <div id="mapa-canvas"></div>
+      <div class="map-legend">
+        <span><span class="dot" style="background:#0ea15a;"></span>Visita con venta</span>
+        <span><span class="dot" style="background:#e74c3c;"></span>Visita sin venta</span>
+        <span style="color:var(--text3);">Tocá un punto para ver el detalle</span>
+      </div>
+    </div>
+  </div>`;
+
+  setTimeout(()=>initMapaVisitas(conGeo), 60);
+}
+
+function initMapaVisitas(visitas){
+  const cont=document.getElementById('mapa-canvas');
+  if(!cont) return;
+  if(typeof L==='undefined'){
+    cont.innerHTML='<div class="map-empty">No se pudo cargar el mapa.<br>Revisá tu conexión a internet e intentá de nuevo.</div>';
+    return;
+  }
+  if(__mapaLeaflet){ try{__mapaLeaflet.remove();}catch(e){} __mapaLeaflet=null; }
+
+  // Centro por defecto: Montevideo.
+  const map = L.map(cont, {scrollWheelZoom:true}).setView([-34.9011,-56.1645], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom:19, attribution:'&copy; OpenStreetMap'
+  }).addTo(map);
+  __mapaLeaflet=map;
+
+  if(!visitas.length){
+    setTimeout(()=>map.invalidateSize(),80);
+    return;
+  }
+
+  const markers=[];
+  visitas.forEach(v=>{
+    const color = v.venta ? '#0ea15a' : '#e74c3c';
+    const m=L.circleMarker([v.lat,v.lng], {radius:7, color:'#fff', weight:1.5, fillColor:color, fillOpacity:0.9});
+    const esc=s=>String(s==null?'':s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+    m.bindPopup(
+      `<b>${esc(v.cliente||'Sin cliente')}</b><br>`+
+      `${esc(v.fecha)} ${esc(v.hora||'')}<br>`+
+      `${esc(v.vendedor||'')}<br>`+
+      `${v.venta?'✅ Con venta':'— Sin venta'}`+
+      `${v.barrio?'<br>📍 '+esc(v.barrio):''}`
+    );
+    m.addTo(map);
+    markers.push(m);
+  });
+
+  const grupo=L.featureGroup(markers);
+  try{ map.fitBounds(grupo.getBounds().pad(0.2)); }catch(e){}
+  setTimeout(()=>map.invalidateSize(),120);
 }
 
 function renderMapaCalor(el){
