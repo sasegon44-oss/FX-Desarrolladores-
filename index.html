@@ -206,6 +206,14 @@ input,select,textarea{font-family:var(--font);}
 .geo-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:geo-rot 0.7s linear infinite;vertical-align:-2px;margin-right:5px;}
 @keyframes geo-rot{to{transform:rotate(360deg);}}
 
+/* ── Toggle GPS / Manual ── */
+.ubic-block{margin-bottom:14px;}
+.ubic-toggle{display:inline-flex;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:3px;gap:3px;margin-bottom:10px;}
+.ubic-tab{border:none;background:transparent;color:var(--text2);font-family:var(--font);font-size:12px;font-weight:600;padding:6px 13px;border-radius:6px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.ubic-tab:hover{color:var(--text);}
+.ubic-tab.active{background:var(--accent);color:#fff;}
+#ubic-gps .geo-manual-link{margin-top:8px;}
+
 /* ── Mapa de visitas (Leaflet) ── */
 #mapa-canvas{height:560px;width:100%;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border2);background:var(--bg3);}
 #mapa-canvas .leaflet-popup-content{font-family:var(--font);font-size:12px;line-height:1.5;}
@@ -642,6 +650,7 @@ function renderHistorica(el){
 // ── NUEVA VISITA ──
 function renderNuevaVisita(el){
   ultimaUbicacion=null;
+  ubicModo='gps';
   const now=new Date();
   const dateStr=now.toISOString().slice(0,10);
   const timeStr=now.toTimeString().slice(0,5);
@@ -658,14 +667,25 @@ function renderNuevaVisita(el){
     </div>
     <div class="form-section">
       <div class="form-section-title">Punto de venta</div>
-      <button type="button" class="btn btn-sm geo-btn" id="geo-btn" onclick="capturarUbicacion()">📍 Detectar mi ubicación</button>
-      <div class="geo-status" id="geo-status"></div>
       <div class="field">
         <label>Cliente / Comercio</label>
         <input type="text" id="f-cliente" placeholder="Elegí uno existente o escribí uno nuevo…" list="clientes-datalist" autocomplete="off" oninput="checkClienteNuevo()"/>
         <datalist id="clientes-datalist">${getClientesAll().map(c=>`<option value="${c}">`).join('')}</datalist>
         <div id="cliente-nuevo-hint" class="client-new-hint" style="display:none;"><span>✨</span><span>Cliente nuevo — se guardará al registrar la visita</span></div>
       </div>
+
+      <div class="ubic-block">
+        <label style="display:block;font-size:11px;color:var(--text3);margin-bottom:6px;">¿Cómo cargás la dirección?</label>
+        <div class="ubic-toggle" role="tablist">
+          <button type="button" class="ubic-tab active" data-modo="gps" onclick="setUbicModo('gps')">📍 Detectar por GPS</button>
+          <button type="button" class="ubic-tab" data-modo="manual" onclick="setUbicModo('manual')">✍️ Cargar manual</button>
+        </div>
+        <div id="ubic-gps">
+          <button type="button" class="btn btn-sm geo-btn" id="geo-btn" onclick="capturarUbicacion()">📍 Detectar mi ubicación</button>
+          <div class="geo-status" id="geo-status"></div>
+        </div>
+      </div>
+
       <div class="field">
         <label>Barrio</label>
         <input type="text" id="f-barrio" placeholder="Ej: Pocitos, Centro, Palermo…" list="barrios-datalist"/>
@@ -757,6 +777,21 @@ function checkClienteNuevo(){
 // ── GEOLOCALIZACIÓN ──
 // Guarda las coordenadas de la última captura (por si luego se quieren persistir).
 let ultimaUbicacion=null;
+// Modo de carga de dirección: 'gps' o 'manual'.
+let ubicModo='gps';
+// Cambia entre detectar por GPS y cargar manual SIN re-renderizar el formulario (no se pierde lo ya cargado).
+function setUbicModo(modo){
+  ubicModo=modo;
+  document.querySelectorAll('.ubic-tab').forEach(b=>b.classList.toggle('active', b.dataset.modo===modo));
+  const gps=document.getElementById('ubic-gps');
+  if(gps) gps.style.display = (modo==='gps') ? '' : 'none';
+  if(modo==='manual'){
+    const st=document.getElementById('geo-status'); if(st){ st.className='geo-status'; st.innerHTML=''; }
+    const b=document.getElementById('f-barrio'); if(b) b.focus();
+  }
+}
+// Botón para pasar a carga manual desde un mensaje de error de GPS.
+const BTN_MANUAL='<div style="margin-top:7px;"><button type="button" class="btn btn-sm btn-secondary" onclick="setUbicModo(\'manual\')">✍️ Cargar manual</button></div>';
 // Poné true SOLO si agregaste columnas `lat` y `lng` (tipo float8) a la tabla `visitas` en Supabase.
 const SAVE_COORDS=true;
 
@@ -770,11 +805,11 @@ function setGeoStatus(tipo, html){
 function capturarUbicacion(){
   const btn=document.getElementById('geo-btn');
   if(!('geolocation' in navigator)){
-    return setGeoStatus('err','Tu dispositivo o navegador no permite geolocalización.');
+    return setGeoStatus('err','Tu dispositivo o navegador no permite geolocalización.'+BTN_MANUAL);
   }
   // La geolocalización solo funciona en contextos seguros (HTTPS o localhost).
   if(window.isSecureContext===false){
-    return setGeoStatus('err','⚠️ La ubicación necesita que la app se abra por <b>https://</b> (no funciona abriendo el archivo directo ni por http).');
+    return setGeoStatus('err','⚠️ La ubicación necesita que la app se abra por <b>https://</b> (no funciona abriendo el archivo directo ni por http).'+BTN_MANUAL);
   }
   if(btn) btn.disabled=true;
   setGeoStatus('loading','<span class="geo-spin"></span>Obteniendo tu ubicación…');
@@ -813,7 +848,7 @@ function capturarUbicacion(){
       if(err.code===1) msg='Permiso de ubicación denegado. Activalo en el navegador para usar esta función.';
       else if(err.code===2) msg='Ubicación no disponible. Probá activar el GPS / datos.';
       else if(err.code===3) msg='Tardó demasiado. Probá de nuevo.';
-      setGeoStatus('err','⚠️ '+msg);
+      setGeoStatus('err','⚠️ '+msg+BTN_MANUAL);
       if(btn) btn.disabled=false;
     },
     {enableHighAccuracy:true, timeout:12000, maximumAge:0}
